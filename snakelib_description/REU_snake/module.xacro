@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ReU_module">
+<xacro:macro name="module" params="module_num">
+<xacro:property name="next_module_num" value="${module_num+1}" />
+	<link name="reu_module_in_${module_num}">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<cylinder length="0.02" radius="0.006"/>
+	      </geometry>
+	      <material name="red">
+		<color rgba="1 0 0 1"/>
+	      </material>
+	    </visual>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="1"/>
+	      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+	    </inertial>
+	  </link>
+	  <link name="reu_module_body_${module_num}">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="-0.02539 -0.02539 -0.9"/>
+	      <geometry>
+		<mesh filename="package://snakelib_description/REU_snake/meshes/ReU.STL" 			scale="0.0254 0.0254 0.0254"/>
+	      </geometry>
+	      <material name="green_dark">
+		<color rgba="0 0.6 0 1"/>
+	      </material>
+	    </visual>
+	    <collision>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<cylinder length="0.0208325" radius="0.02539"/>
+	      </geometry>
+	    </collision>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="0.103"/>
+	      <inertia ixx="2.948" ixy="0.0452" ixz="0.4092" iyy="2.9305" iyz="-0.405" 			izz="1.819"/>
+	    </inertial>
+	  </link>
+	  <link name="reu_module_out_${module_num}">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<cylinder length="0.015" radius="0.006"/>
+	      </geometry>
+	      <material name="blue">
+		<color rgba="0 0 1 1"/>
+	      </material>
+	    </visual>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="0"/>
+	      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+	    </inertial>
+	  </link>
+	  <joint name="reu_joint_in2body_${module_num}" type="fixed">
+	    <parent link="reu_module_in_${module_num}"/>
+	    <child link="reu_module_body_${module_num}"/>
+	    <origin rpy="1.57076327 0 0" xyz="0 -0.0066 0"/>
+	  </joint>
+	  <joint name="reu_joint_body2out_${module_num}" type="fixed">
+	    <parent link="reu_module_body_${module_num}"/>
+	    <child link="reu_module_out_${module_num}"/>
+	    <origin rpy="0 1.57076327 0" xyz="0 0 0.044"/>
+	  </joint>
+	  <joint name="reu_joint_out2in_${module_num}" type="revolute">
+	    <parent link="reu_module_out_${module_num}"/>
+	    <child link="reu_module_in_${next_module_num}"/>
+	    <axis xyz="0 0 1"/>
+	    <origin rpy="0 3.14152654 -1.57076327" xyz="0 0 0"/>
+	    <dynamics damping="0.1" friction="0.2"/>
+	    <limit effort="7.0" lower="-1.57076327" upper="1.57076327" velocity="2.2"/>
+	  </joint>
+	  <transmission name="module_2_module_trans_${module_num}">
+	    <type>transmission_interface/SimpleTranmission</type>
+	    <actuator name="module_actuator_0">
+	      <mechanicalReduction>1</mechanicalReduction>
+	    </actuator>
+	    <joint name="reu_joint_out2in_${module_num}">
+	      <hardwareInterface>PositionJointInterface</hardwareInterface>
+	    </joint>
+	  </transmission>
+</xacro:macro>
+</robot>

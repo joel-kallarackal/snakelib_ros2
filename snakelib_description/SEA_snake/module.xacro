@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ReU_module">
+<xacro:macro name="module" params="module_num">
+<xacro:property name="next_module_num" value="${module_num+1}" />
+<xacro:if value="${module_num > 9}">
+	<xacro:property name="prefix" value="SA0" />
+</xacro:if>
+<xacro:unless value="${module_num > 9}" >
+	<xacro:property name="prefix" value="SA00" />
+</xacro:unless>
+
+<xacro:unless value="${next_module_num > 9}" >
+	<xacro:property name="next_prefix" value="SA00" />
+</xacro:unless>
+<xacro:if value="${next_module_num > 9}" >
+	<xacro:property name="next_prefix" value="SA0" />
+</xacro:if>
+
+	<gazebo reference="${prefix}${module_num}__MoJo__OUTPUT_BODY">
+	    <mu1>0.9</mu1>
+	    <mu2>0.9</mu2>
+	    <material>Gazebo/Red</material>
+	    <static>false</static>
+	    <selfCollide>true</selfCollide>
+	  </gazebo>
+	  <gazebo reference="${prefix}${module_num}__MoJo__INPUT_INTERFACE">
+	    <mu1>0.9</mu1>
+	    <mu2>0.9</mu2>
+	    <material>Gazebo/Red</material>
+	    <static>false</static>
+	    <selfCollide>true</selfCollide>
+	  </gazebo>
+	  <gazebo reference="${prefix}${module_num}__MoJo__INPUT_INTERFACE__COLLAR">
+	    <mu1>0.9</mu1>
+	    <mu2>0.9</mu2>
+	    <material>Gazebo/Black</material>
+	    <static>false</static>
+	    <selfCollide>true</selfCollide>
+	  </gazebo>
+	  
+	  <link name="${prefix}${module_num}__MoJo__INPUT_INTERFACE">
+	    <visual>
+	      <origin rpy="1.57075 0 0" xyz="0 0 0.035"/>
+	      <geometry>
+		<mesh filename="package://snakelib_description/SEA_snake/meshes/rotary_input.stl"/>
+	      </geometry>
+	      <material name="red">
+		<color rgba=".82 0.06 0.06 1"/>
+	      </material>
+	    </visual>
+	    <collision>
+	      <origin rpy="0 0 0" xyz="0 0 0.0183"/>
+	      <geometry>
+		<cylinder length="0.033" radius="0.026"/>
+	      </geometry>
+	    </collision>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0.0366"/>
+	      <mass value="0.103"/>
+	      <inertia ixx="5.4796e-05" ixy="0" ixz="0" iyy="5.4796e-05" iyz="0" izz="3.4814e-05"/>
+	    </inertial>
+	  </link>
+	  <link name="${prefix}${module_num}__MoJo__INPUT_INTERFACE__COLLAR">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="0 0 0.005"/>
+	      <geometry>
+		<cylinder length="0.01" radius="0.026"/>
+	      </geometry>
+	      <material name="black">
+		<color rgba="0 0 0 1"/>
+	      </material>
+	    </visual>
+	    <!-- <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="0.001"/>
+	      <inertia ixx="5.4796e-05" ixy="0" ixz="0" iyy="5.4796e-05" iyz="0" izz="3.4814e-05"/>
+	    </inertial> -->
+	  </link>
+	  <joint name="${prefix}${module_num}__MoJo__INPUT_INTERFACE__COLLAR_JOINT" type="fixed">
+	    <parent link="${prefix}${module_num}__MoJo__INPUT_INTERFACE"/>
+	    <child link="${prefix}${module_num}__MoJo__INPUT_INTERFACE__COLLAR"/>
+	  </joint>
+	  <joint name="${prefix}${module_num}__MoJo" type="revolute">
+	    <parent link="${prefix}${module_num}__MoJo__INPUT_INTERFACE"/>
+	    <child link="${prefix}${module_num}__MoJo__OUTPUT_BODY"/>
+	    <origin rpy="0 0 0" xyz="0 0 0.0366"/>
+	    <axis xyz="0 1 0"/>
+	    <dynamics damping=".1" friction="0.2"/>
+	    <limit effort="7.0" lower="-1.57" upper="1.57" velocity="2.208932"/>
+	  </joint>
+	  <link name="${prefix}${module_num}__MoJo__OUTPUT_BODY">
+	    <visual>
+	      <origin rpy="1.57075 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<mesh filename="package://snakelib_description/SEA_snake/meshes/rotary_output.stl"/>
+		<!-- <cylinder radius=".0025" length=".1" /> -->
+	      </geometry>
+	      <material name="red">
+		<color rgba=".82 0.06 0.06 1"/>
+	      </material>
+	    </visual>
+	    <collision>
+	      <origin rpy="0 0 0" xyz="0 0 0.0183"/>
+	      <geometry>
+		<cylinder length="0.033" radius="0.026"/>
+	      </geometry>
+	    </collision>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="0.103"/>
+	      <inertia ixx="5.4796e-05" ixy="0" ixz="0" iyy="5.4796e-05" iyz="0" izz="3.4814e-05"/>
+	    </inertial>
+	  </link>
+	  <joint name="${prefix}${module_num}__MoJo__OUTPUT_INTERFACE" type="fixed">
+	    <parent link="${prefix}${module_num}__MoJo__OUTPUT_BODY"/>
+	    <child link="${next_prefix}${next_module_num}__MoJo__INPUT_INTERFACE"/>
+	    <origin rpy="0 0 -1.57075" xyz="0 0 0.0273"/>
+	  </joint>
+</xacro:macro>
+</robot>

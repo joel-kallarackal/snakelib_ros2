@@ -1,0 +1,86 @@
+<?xml version="1.0" ?>
+<robot name="REU_snake" xmlns:xacro="http://ros.org/wiki/xacro">
+	<xacro:include filename="module.xacro" />
+	<xacro:arg name="number_of_modules" default="16"/>
+	<xacro:property name="module_number" value="$(arg number_of_modules)" />
+	<link name="kdl_dummy_root"/>
+	  <joint name="kdl_dummy_root_to_dummy_head" type="fixed">
+	    <parent link="kdl_dummy_root"/>
+	    <child link="reu_module_in_0"/>
+	    <origin rpy="0 -1.57079632679 0" xyz="0 0 0.026"/>
+	  </joint>
+
+	  <xacro:macro name="loop" params="module_count">
+	  <xacro:module module_num="${module_number - module_count - 1}" />
+		<xacro:if value="${module_count}">
+		   <xacro:loop module_count="${module_count-1}" />
+		</xacro:if>
+	  </xacro:macro>
+
+	<xacro:loop module_count="${module_number-1}" />
+	
+	<link name="reu_module_in_${module_number}">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<cylinder length="0.02" radius="0.006"/>
+	      </geometry>
+	      <material name="red">
+		<color rgba="1 0 0 1"/>
+	      </material>
+	    </visual>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="1"/>
+	      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+	    </inertial>
+	  </link>
+	  <link name="reu_module_body_${module_number}">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="-0.02539 -0.02539 -0.9"/>
+	      <geometry>
+		<mesh filename="package://snakelib_description/REU_snake/meshes/ReU.STL" scale="0.0254 0.0254 0.0254"/>
+	      </geometry>
+	      <material name="green_light">
+		<color rgba="0 0.4 0 1"/>
+	      </material>
+	    </visual>
+	    <collision>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<cylinder length="0.0208325" radius="0.02539"/>
+	      </geometry>
+	    </collision>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="0.103"/>
+	      <inertia ixx="2.948" ixy="0.0452" ixz="0.4092" iyy="2.9305" iyz="-0.405" izz="1.819"/>
+	    </inertial>
+	  </link>
+	  <link name="reu_module_out_${module_number}">
+	    <visual>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+		<cylinder length="0.015" radius="0.006"/>
+	      </geometry>
+	      <material name="blue">
+		<color rgba="0 0 1 1"/>
+	      </material>
+	    </visual>
+	    <inertial>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <mass value="0"/>
+	      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+	    </inertial>
+	  </link>
+	  <joint name="reu_joint_in2body_${module_number}" type="fixed">
+	    <parent link="reu_module_in_${module_number}"/>
+	    <child link="reu_module_body_${module_number}"/>
+	    <origin rpy="1.57076327 0 0" xyz="0 -0.0066 0"/>
+	  </joint>
+	  <joint name="reu_joint_body2out_${module_number}" type="fixed">
+	    <parent link="reu_module_body_${module_number}"/>
+	    <child link="reu_module_out_${module_number}"/>
+	    <origin rpy="0 1.57076327 0" xyz="0 0 0.044"/>
+	  </joint>
+</robot>

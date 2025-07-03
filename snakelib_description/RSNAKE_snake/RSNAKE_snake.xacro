@@ -1,0 +1,44 @@
+<?xml version="1.0" ?>
+<robot name="REU_snake" xmlns:xacro="http://ros.org/wiki/xacro">
+	<xacro:include filename="module.xacro" />
+	<xacro:arg name="number_of_modules" default="14"/>
+	<xacro:property name="module_number" value="$(arg number_of_modules)" />
+	
+	<link name="kdl_dummy_root"/>
+	<joint name="kdl_dummy_root_to_module_0" type="fixed">
+		<parent link="kdl_dummy_root"/>
+		<child link="module_0"/>
+		<origin rpy="0 0 0" xyz="0. 0 0.05"/>
+	</joint>
+	
+	  <xacro:macro name="loop" params="module_count">
+	  <xacro:module module_num="${module_number - module_count - 1}" />
+		<xacro:if value="${module_count}">
+		   <xacro:loop module_count="${module_count-1}" />
+		</xacro:if>
+	  </xacro:macro>
+
+	<xacro:loop module_count="${module_number-1}" />
+	
+	<link name="module_${module_number}">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"/>
+			<geometry>
+				<mesh filename="package://snakelib_description/RSNAKE_snake/meshes/R8_16_link.stl" scale="0.001 0.001 0.001"/>
+			</geometry>
+			<material name="black">
+        			<color rgba="0 0 0 0.9"/>
+      			</material>
+		</visual>
+		<collision>
+			<origin rpy="0 1.57 0" xyz="0.118 0 0"/>
+			<geometry>
+				<cylinder length="0.1450" radius="0.05"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="1.072"/>
+			<inertia ixx="0.0104" ixy="0.0" ixz="0.0" iyy="0.0104" iyz="0.0" izz="0.0104"/>
+		</inertial>
+	</link>
+</robot>
