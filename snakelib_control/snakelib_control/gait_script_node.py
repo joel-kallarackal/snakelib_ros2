@@ -33,6 +33,8 @@ def main():
                     cmd = SnakeCommand()
                     cmd.command_name = command
                     pub.publish(cmd)
+                    
+                    rclpy.spin_once(node)
                     rate.sleep()
     except (ExternalShutdownException, KeyboardInterrupt):
         pass

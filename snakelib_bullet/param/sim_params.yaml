@@ -1,9 +1,11 @@
 pybullet_interface:  # This must match your node's name or namespace
   ros__parameters:
+    snake_type: "REU"
     loop_rate: 100.0
     urdf_spawn_pose: [0.0, 0.0, 0.0] # x,y,z
     tracking_cam: False 
     cam_angle: [2.0, 0.0, -45.0] # dist, yaw, pitch
     max_torque: 16.0 # Nm, changed for R-snake - need to make this parameter as specific to snake
     joint_control_mode: 0 # 0: position, 1: velocity, 2: torque control
-    # terrain_path: "path_to_your_urdf"
+    terrain_path: "path_to_your_urdf"
+    save_movie: 0

@@ -452,6 +452,8 @@ class JoystickTeleop(Node):
             # Publish the SnakeCommand
             self.snake_command_pub.publish(self._snake_command)
             self._last_sent = self._snake_command.command_name
+
+            rclpy.spin_once(self)
             rate.sleep()
 
 

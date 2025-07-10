@@ -327,6 +327,7 @@ class CommandManager(Node):
 
             else:
                 self.logwarn_throttle(0.25, "Sensor watchdog time exceeded. Joint commands not sent.")
+            rclpy.spin_once(self)
             rate.sleep()
 
     def logwarn_throttle(self, period_sec: float, msg: str, key='default'):

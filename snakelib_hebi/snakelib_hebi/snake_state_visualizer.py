@@ -114,6 +114,8 @@ class SnakeStateVisualizer(Node):
 
         while rclpy.ok():
             self.run_loop()
+
+            rclpy.spin_once(self)
             rate.sleep()
 
     def update_base_transform(self):

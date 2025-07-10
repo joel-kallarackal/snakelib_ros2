@@ -89,6 +89,8 @@ class HEBIROSWrapper(Node):
 
         while rclpy.ok():
             self.run_loop()
+
+            rclpy.spin_once(self)
             rate.sleep()
 
     def run_loop(self):

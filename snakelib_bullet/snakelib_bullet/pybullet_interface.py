@@ -68,7 +68,6 @@ class PyBulletRosWrapper(Node):
             1: p.VELOCITY_CONTROL,
             2: p.TORQUE_CONTROL,
         }
-
         self.save_movie = self.get_parameter('save_movie').value # whether to save a movie
 
         self.create_service(Empty, 'reset_simulation', self.handle_reset_simulation)
@@ -112,7 +111,6 @@ class PyBulletRosWrapper(Node):
             self.joint_command_callback,
             10)
         self.joint_command_sub  # prevent unused variable warning
-
         self.warn = False
 
         # initialize publishers
@@ -120,7 +118,6 @@ class PyBulletRosWrapper(Node):
 
         # TODO: implement a way to simulate IMU readings OR publish orientations directly
         # imu_pub = rospy.Publisher('/snake/joint_states', , queue_size=100)
-
         self.joint_state = JointState()
 
     def start(self):
@@ -132,9 +129,8 @@ class PyBulletRosWrapper(Node):
             self.start_video_log()
 
         while rclpy.ok():
-
             self.send_joint_commands()
-
+            
             time_now = self.get_clock().now().to_msg()
             self.joint_state.header.stamp = time_now
             (
@@ -142,15 +138,17 @@ class PyBulletRosWrapper(Node):
                 self.joint_state.velocity,
                 self.joint_state.effort,
             ) = self.get_feedback()
-
+            
             self.joint_state_pub.publish(self.joint_state)
-
+            
             # TODO: IMU reading publisher
             if self.tracking_cam:
                 self.update_cam_view(self.cam_angle)
-
+            
             if not self.pause_simulation:
                 p.stepSimulation()
+            
+            rclpy.spin_once(self)
             rate.sleep()
 
         # Save movie if necessary
