@@ -10,6 +10,7 @@ from sensor_msgs.msg import JointState
 import numpy as np
 from rclpy.clock import Clock
 from builtin_interfaces.msg import Time
+from rclpy.parameter import Parameter
 
 class PyBulletRosWrapper(Node):
     def __init__(self, **kwargs):
@@ -18,21 +19,32 @@ class PyBulletRosWrapper(Node):
         # parameters should be declared while launching this node
         # Or
         # Declare them below
-        self.declare_parameters(
-            namespace='',
-            parameters=[
-                ('snake_type', "REU"),
-                ('loop_rate', 100.0),
-                ('urdf_spawn_pose', [0.0, 0.0, 0.0]),
-                ('terrain_path', ""),
-                ('robot_description', ""),
-                ('tracking_cam', False),
-                ('cam_angle', [2.0, 0.0, -45.0]),
-                ('max_torque', 7),
-                ('joint_control_mode', 0),
-                ('save_movie', 0),
-            ]
-        )
+        # self.declare_parameters(
+        #     namespace='',
+        #     parameters=[
+        #         ('snake_type', "REU"),
+        #         ('loop_rate', 100.0),
+        #         ('urdf_spawn_pose', [0.0, 0.0, 0.0]),
+        #         ('terrain_path', ""),
+        #         ('robot_description', ""),
+        #         ('tracking_cam', False),
+        #         ('cam_angle', [2.0, 0.0, -45.0]),
+        #         ('max_torque', 7),
+        #         ('joint_control_mode', 0),
+        #         ('save_movie', 0),
+        #     ]
+        # )
+        self.declare_parameter('snake_type', Parameter.Type.STRING)
+        self.declare_parameter('loop_rate', Parameter.Type.DOUBLE)
+        self.declare_parameter('urdf_spawn_pose',Parameter.Type.DOUBLE_ARRAY)
+        self.declare_parameter('terrain_path', Parameter.Type.STRING)
+        self.declare_parameter('robot_description', Parameter.Type.STRING)
+        self.declare_parameter('tracking_cam', Parameter.Type.BOOL)
+        self.declare_parameter('cam_angle', Parameter.Type.DOUBLE_ARRAY)
+        self.declare_parameter('max_torque', Parameter.Type.DOUBLE)
+        self.declare_parameter('joint_control_mode', Parameter.Type.INTEGER)
+        self.declare_parameter('save_movie', Parameter.Type.INTEGER)
+
 
         # Load snake type and set urdf path
         self._snake_type = self.get_parameter('snake_type').value
