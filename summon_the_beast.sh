@@ -4,18 +4,13 @@
 WS_DIR=~/snake_ros2_ws
 SRC_DIR=$WS_DIR/src
 
-# Create workspace
 mkdir -p $SRC_DIR
 cd $SRC_DIR
 
-# Clone the repo (replace with your GitHub URL)
 git clone https://github.com/joel-kallarackal/snakelib_ros2.git
 
-# Move the contents of the repo up if necessary
-# (only do this if repo contains the packages, not already inside 'src')
 mv snakelib_ros2/* .
 
-# Remove the empty folder
 rmdir snakelib_ros2
 
 echo "Workspace Setup Complete."
