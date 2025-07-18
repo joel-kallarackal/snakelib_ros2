@@ -11,7 +11,7 @@ git clone https://github.com/joel-kallarackal/snakelib_ros2.git
 
 mv snakelib_ros2/* .
 
-rm -rf snakelib_ros2
+rmdir snakelib_ros2
 
 echo "Workspace Setup Complete."
 echo "Starting Build..."
