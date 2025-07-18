@@ -10,23 +10,23 @@ command_manager:
             max_torque: 7 # Nm
             max_velocity: 3 #rad/s
             # Module names must be written in order from head to tail.
-            module_names: ['RUB-013',
-                    'RUB-020',
+            module_names: ['RUB-002',
+                    'RUB-014',
                     'RUB-019',
-                    'RUB_001',
-                    'RUB_009',
+                    'RUB-009',
                     'RUB-021',
-                    'RUB_015',
-                    'RUB_002',
-                    'RUB_004',
-                    'RUB-006',
-                    'RUB_003',
-                    'RUB_010',
-                    'RUB_008',
-                    'RUB_012',
-                    'RUB_016',
-                    'RUB_017']
-            home: [0.58, 0., 0.82,  0., -0.4, 0., -0.96, 0., 0.52, 0., 0.89, 0., -0.89, 0.0, -0.12, 0.0]
+                    'RUB-015',
+                    'RUB-018',
+                    'RUB-005',
+                    'RUB-003',
+                    'RUB-010',
+                    'RUB-008',
+                    'RUB-001',
+                    'RUB-013',
+                    'RUB-012',
+                    'RUB_006',
+                    'RUB-017']
+            home: [0.58, 0.0, 0.82,  0.0, -0.4, 0.0, -0.96, 0.0, 0.52, 0.0, 0.89, 0.0, -0.89, 0.0, -0.12, 0.0]
             zero_offset: [0.0, 0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] # Subtracted from computed joint angles
             
             go_to_position_controller:
@@ -145,8 +145,8 @@ command_manager:
                 'SA053',
                 'SA026',
                 'SA024']
-            home: [0.58, 0., 0.82,  0., -0.4, 0., -0.96, 0., 0.52, 0., 0.89, 0., -0.89, 0.0, -0.12, 0.0]
-            zero_offset: [0., 0.,  0.,  0., 0.  , 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.0, 0.0]
+            home: [0.58, 0.0, 0.82,  0.0, -0.4, 0.0, -0.96, 0.0, 0.52, 0.0, 0.89, 0.0, -0.89, 0.0, -0.12, 0.0]
+            zero_offset: [0.0, 0.0,  0.0,  0.0, 0.0  , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             go_to_position_controller:
                 transition_time: 1.5
             gaitlib_controller:
@@ -261,8 +261,8 @@ command_manager:
                 'R8-00232',
                 'R8-00099']
 
-            home: [0.0, 0.0, -0.6, 0.0, 0.5, 0.0, 0.5, 0.0, -0.5, 0.0, 0.5, 0.0, 0.6, 0]
-            zero_offset: [0., 0., 0., 0., 0. , 0., 0., 0., 0., 0., 0., 0., 0., 0.0]
+            home: [0.0, 0.0, -0.6, 0.0, 0.5, 0.0, 0.5, 0.0, -0.5, 0.0, 0.5, 0.0, 0.6, 0.0]
+            zero_offset: [0.0, 0.0, 0.0, 0.0, 0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             go_to_position_controller:
                 transition_time: 5.0
             gaitlib_controller:

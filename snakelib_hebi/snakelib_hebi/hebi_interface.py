@@ -4,31 +4,29 @@ import hebi
 from rclpy.duration import Duration
 import os
 from rclpy.parameter import Parameter
-
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class HEBIROSWrapper(Node):
     def __init__(self, node_name="hebi_ros_wrapper", **kwargs):
         super().__init__(node_name, **kwargs)
         
-        # Use default values if parameters are not launch from the launch file
-        # self.declare_parameters(
-        #     namespace='',
-        #     parameters=[
-        #         ('snake_type', "REU"),
-        #         ('hebi_feedback_frequency', 100.0),
-        #         ('hebi_control_frequency', 100.0),
-        #         ('hebi_command_lifetime', 1000.0)
-        #     ]
-        # )
+        params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'snake_params.yaml')
         
-        self.declare_parameter('snake_type', Parameter.Type.STRING)
-        self.declare_parameter('hebi_feedback_frequency', Parameter.Type.DOUBLE)
-        self.declare_parameter('hebi_control_frequency', Parameter.Type.DOUBLE)
-        self.declare_parameter('hebi_command_lifetime', Parameter.Type.DOUBLE)
+        with open(params_path1, "r") as file:
+            data = yaml.safe_load(file)
+
+        params_path2 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+        with open(params_path2, "r") as file:
+            self._snake_type = yaml.safe_load(file).get("snake_type")
+        
+        self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
 
         # Get robot specific configs.
-        self.robot_name = self.get_parameter('snake_type').value
-        robot_configs =  self.get_parameter(f"{self.robot_name}").value
+        self.robot_name = self._snake_type
+        robot_configs =  self._snake_param
 
         # Get the module names.
         self.module_names = robot_configs.get("module_names", [])
@@ -45,9 +43,9 @@ class HEBIROSWrapper(Node):
 
         self.num_modules = self.robot.size
 
-        self.feedback_frequency = self.get_parameter("hebi_feedback_frequency").value  # Hz
-        self.control_frequency = self.get_parameter("hebi_control_frequency").value  # Hz
-        self.robot.command_lifetime = self.get_parameter("hebi_command_lifetime").value # ms
+        self.feedback_frequency = data.get("command_manager").get("ros__parameters").get("hebi_feedback_frequency")  # Hz
+        self.control_frequency = data.get("command_manager").get("ros__parameters").get("hebi_control_frequency")  # Hz
+        self.robot.command_lifetime = data.get("command_manager").get("ros__parameters").get("hebi_command_lifetime") # ms
 
         # Issue a warning should the loop frequence be too low.
         if min(self.feedback_frequency, self.control_frequency) < (1000 / self.robot.command_lifetime):
@@ -70,7 +68,7 @@ class HEBIROSWrapper(Node):
 
         # Initialize robot handle.
         self.robot = self.lookup.get_group_from_names("*", self.module_names)
-        lookup_success = self.robot is not None
+        lookup_success = True if self.robot is not None else False
         return lookup_success
     
     def start_log(self):

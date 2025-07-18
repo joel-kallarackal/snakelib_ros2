@@ -2,12 +2,12 @@ import numpy as np
 import rclpy
 from sensor_msgs.msg import JointState
 
-from snakelib_control.abstract_controller import AbstractController
+from snakelib_control.scripts.abstract_controller import AbstractController
 from snakelib_control.gaitlib.reu_gaits import ReuGaits
 from snakelib_control.gaitlib.rsnake_gaits import RsnakeGaits
 from snakelib_control.gaitlib.sea_gaits import SeaGaits
 
-from .utils import Robot
+from snakelib_control.scripts.utils import Robot
 
 
 class GaitlibController(AbstractController):
@@ -55,7 +55,7 @@ class GaitlibController(AbstractController):
 
         self.robot = Robot(robot_name=self._snake_type, num_modules=len(self._module_names))
 
-        self._last_time = current_joint_state.header.stamp  # used to keep track of actual elapsed time
+        self._last_time = current_joint_state.header.stamp.nanosec  # used to keep track of actual elapsed time
 
         self._current_joint_state = current_joint_state
 
@@ -194,8 +194,8 @@ class GaitlibController(AbstractController):
         # Pack JointState message
         joint_state_msg = JointState()
         joint_state_msg.name = self._module_names
-        joint_state_msg.velocity = np.array([np.nan] * len(joint_state_msg.position))
-        joint_state_msg.effort = np.array([np.nan] * len(joint_state_msg.position))
+        joint_state_msg.velocity = list(np.array([np.nan] * len(joint_state_msg.position)))
+        joint_state_msg.effort = list(np.array([np.nan] * len(joint_state_msg.position)))
 
         # Race condition handing.
         # If received snake command is changed between instantiating a gaitlib controller
@@ -213,14 +213,16 @@ class GaitlibController(AbstractController):
         wave_direction = self._desired_gait_param.get("speed_multiplier", 1)
         pole_direction = np.sign(self._desired_gait_param.get("pole_direction", 1))
 
-        current_time = current_joint_state.header.stamp
+        current_time = current_joint_state.header.stamp.nanosec
 
         # Potentially refactor headlook as a seperate class of controller.
         headlook_multiplier = 0 if self._desired_gait == "head_look" else 1
 
+        current_time = current_time if isinstance(current_time, int) else current_time.nanosec
+        self._last_time = self._last_time if isinstance(self._last_time, int) else self._last_time.nanosec
         transition_dt = current_time - self._last_time
         snake_dt = (headlook_multiplier) * (pole_direction) * (wave_direction) * transition_dt
-        self._snake_time = self._snake_time + snake_dt.to_sec()
+        self._snake_time = self._snake_time + snake_dt*(1e-9) # 1e-9 is to convert nanoseconds to seconds
         self._last_time = current_time
 
         # Determine joint angles. Note that gaits for REU, SEA, and RSNAKE are identical
@@ -240,8 +242,8 @@ class GaitlibController(AbstractController):
             joint_angles = desired_gait_joint_angles
 
         # Update transition progress
-        self._transition_progress += np.abs(transition_dt.to_sec()) / self._transition_time
+        self._transition_progress += np.abs(transition_dt*(1e-9)) / self._transition_time # 1e-9 is to convert nanoseconds to seconds
         self._transition_progress = min(self._transition_progress, 1.0)
 
-        joint_state_msg.position = joint_angles
+        joint_state_msg.position = list(joint_angles)
         return joint_state_msg

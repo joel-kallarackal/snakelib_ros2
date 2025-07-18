@@ -15,6 +15,10 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 import time
 
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
+
 class JoystickTeleop(Node):
     def __init__(self):
         """Initializes the JoystickTeleop
@@ -23,16 +27,14 @@ class JoystickTeleop(Node):
         snake_type: string denote the type of snake, e.g. "REU"
         """
         super().__init__('joystick_teleop')
-
-        # self.declare_parameter("snake_type", "REU")
-        self.declare_parameter("snake_type", Parameter.Type.STRING)
-        self.snake_type = self.get_parameter("snake_type")
-
-        # self.declare_parameter("joystick_name", "logi_cordless_rumblepad2")
-        self.declare_parameter("joystick_name", Parameter.Type.STRING)
-        self.joystick_name = self.get_parameter("joystick_name")
-
-        self._param_folder_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/param/"
+        launch_params_path = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+        with open(launch_params_path, "r") as file:
+            launch_params = yaml.safe_load(file)
+            self.snake_type = launch_params.get("snake_type")
+            self.joystick_name = launch_params.get("joystick_name")
+        
+        self._param_folder_path = os.path.join(get_package_share_directory('snakelib_control'), 'param/')
 
         self._loop_rate = 50
         self._snake_command = SnakeCommand()
@@ -72,7 +74,7 @@ class JoystickTeleop(Node):
         with open(params_path, "r") as file:
             data = yaml.safe_load(file)
         
-        self._snake_params = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
+        self._snake_params = data.get("command_manager").get("ros__parameters").get(f"{self.snake_type}", {})
         self._gait_params = self._snake_params.get("gait_params", {})
         self._tightness = 0
 
@@ -112,6 +114,201 @@ class JoystickTeleop(Node):
 
         self._mode_logged = False
 
+        timer_period = 1.0 / self._loop_rate
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+
+        self._last_warn_time = None
+
+    def timer_callback(self):
+        speed_multiplier = 1.0
+
+        ## Command processing logic ##
+        if self._mapped_command == "":
+            # If the mapped command is nothing, set the command to hold position
+            self.command = "hold_position"
+            speed_multiplier = 0.0
+
+            # Reset sidewind slope
+            self._slope_sidewind = self._slope_default
+
+        else:
+            # Otherwise process the input
+            self._command_list = self._mapped_command.split("__")
+
+            if self._command_list[0] == "mode":
+
+                # For change to head look mode, cache the previous mode
+                if self._command_list[1] == "head_look":
+                    self._prev_mode = self.current_mode
+                    self.current_mode = "mode__head_look"
+
+                    # Inform the user about the previous mode
+                    self.get_logger().info(f"Previous mode: {self._prev_mode.split('__')[1]}")
+
+                # For other mode changes
+                else:
+                    self._prev_mode = self.current_mode
+                    self.current_mode = self._command_list[0] + "__" + str(self._command_list[1])
+                
+                if self._command_list[1] == "pole_climb":
+                    self.command = "home"
+                else:
+                    self.command = "hold_position"
+                    speed_multiplier = 0.0
+
+                # Inform the user about the mode change
+                self.get_logger().info(f"Current mode: {self.current_mode.split('__')[1]}")
+
+                # Reset the mapped command to avoid multiple mode changes
+                self._mapped_command = ""
+
+            elif self._command_list[0] == "head_look_exit":
+                self.current_mode = self._prev_mode
+
+                self.loginfo_throttle(5, f"Current mode: {self.current_mode.split('__')[1]}")
+
+                self.command = self._command_list[0]
+                speed_multiplier = 0.0
+
+            elif self._command_list[0] == "home":
+                # Home position as defined in snakelib_control/param/snake_params.yaml
+                self.command = self._command_list[0]
+                speed_multiplier = 0.0
+                self.speed_factor = 1
+                self._has_pole_direction = False
+                self._switch_flag = 0
+                self._tightness = self._tightness_min
+                self._pole_direction = 0
+                self._slope_sidewind = self._slope_default
+
+                # Reset the mode to normal mode
+                self.current_mode = "mode__normal"
+
+                # Inform the user about the mode change and home position only every 5 sec to avoid spamming the console
+                self.loginfo_throttle(5, "Reset to Home position")
+                self.loginfo_throttle(5, f"Current mode: {self.current_mode.split('__')[1]}")
+
+            elif self._command_list[0] == "g":
+                # Set selected gait
+                self.command = self._command_list[1]
+                speed_multiplier = 1.0
+
+                # Add the axes states only for head look gait
+                if self.command == "head_look":
+                    # TODO: Remove the hardcoded values
+                    self._x_state, self._y_state = self.joy_state[2:4]
+
+                if self.command == "head_look_ik":
+                    # TODO: Remove the hardcoded values
+                    (
+                        self._x_state,
+                        self._y_state,
+                        self._z_state,
+                        self._roll,
+                        self._pitch,
+                        self._yaw,
+                    ) = self.joy_state[:6]
+
+                # Reset sidewind slope value if the selected gait is not conical_sidewinding
+                if self.command != "conical_sidewinding":
+                    self._slope_sidewind = self._slope_default
+
+                # Set _direction based on the joystick input for gaits mapped to buttons
+                if self._command_list[2] == "plus":
+                    self._direction = 1
+                elif self._command_list[2] == "minus":
+                    self._direction = -1
+
+            elif self._command_list[0] == "g_pole" and self._has_pole_direction:
+                # Only set pole gait if pole direction is set
+                self.command = self._command_list[1]
+                speed_multiplier = 1.0
+
+            elif self._command_list[0] == "speed" and self.command != "hold_position" and self.command != "home":
+                # Increase/decrease speed
+                self.speed_factor += self._speed_step if self._command_list[1] == "plus" else -self._speed_step
+
+                self.speed_factor = np.clip(self.speed_factor, self._speed_min, self._speed_max)
+
+            elif self._command_list[0] == "tightness" and self._has_pole_direction:
+                # TODO: Add ability to just change tightness and not roll
+                # Increase/decrease tightness
+                self._tightness += self._tightness_step if self._command_list[1] == "plus" else -self._tightness_step
+
+                self._tightness = np.clip(self._tightness, self._tightness_min, self._tightness_max)
+
+                self.command = "rolling_helix"
+                if self._last_sent != "rolling_helix":
+                    self._direction = 0
+
+            elif self._command_list[0] == "slope" and self.command == "conical_sidewinding":
+                # Increase/decrease conical sidewinding slope
+                self._slope_sidewind += self._slope_step if self._command_list[1] == "plus" else -self._slope_step
+
+                self._slope_sidewind = np.clip(self._slope_sidewind, -self._slope_max, self._slope_max)
+
+            elif self._command_list[0] == "pole_direction":
+                # Set command to pole direction
+                self.command = self._command_list[0]
+
+                # self._direction will be -1 for right curve and +1 for left curve
+                self._pole_direction = self._direction
+
+                # Reest the speed factor when starting pole climbing
+                self.speed_factor = 1.0
+
+                # Set the flag true to start pole climbing
+                self._has_pole_direction = True
+
+            elif self._command_list[0] == "light_toggle":
+                # Toggle light in snake head
+                # self.declare_parameter('/led', False)
+                self.declare_parameter('/led', Parameter.Type.BOOL)
+                current_led = self.get_parameter("/led")
+                self.set_parameters([Parameter('led', Parameter.Type.BOOL, not current_led)])
+
+            else:
+                # Pass case for any other edge cases
+                self.command = "hold_position"
+                speed_multiplier = 0.0
+
+        ## Publish the command ##
+        # Calculate speed_multiplier
+        speed_multiplier *= self._direction * self.speed_factor
+
+        # Populate the SnakeCommand message
+        self._snake_command.command_name = self.command
+        self._snake_command.param_name = ["speed_multiplier"]
+        self._snake_command.param_value = [speed_multiplier]
+
+        # Add tightness and wt parameters only when pole climbing direction is set
+        if self._has_pole_direction:
+            self._snake_command.param_name.extend(["tightness", "pole_direction", "wt_direction"])
+            self._snake_command.param_value.extend([self._tightness, self._pole_direction, self._wt_dir])
+
+        # Add x & y state only when head look gait is selected
+        if self.command == "head_look":
+            self._snake_command.param_name.extend(["x_state", "y_state"])
+            self._snake_command.param_value.extend([self._x_state, self._y_state])
+
+        # Add x, y, z, pitch & yaw states only when inverse kinematics based head look gait is selected
+        if self.command == "head_look_ik":
+            self._snake_command.param_name.extend(["x_state", "y_state", "z_state"])
+            self._snake_command.param_name.extend(["roll", "pitch", "yaw"])
+            self._snake_command.param_value.extend([self._roll, self._pitch, self._yaw])
+            self._snake_command.param_value.extend([self._x_state, self._y_state, self._z_state])
+
+        # Add slope parameter only when conical_sidewinding gait is selected
+        if self.command == "conical_sidewinding":
+            self._snake_command.param_name.extend(["slope"])
+            self._snake_command.param_value.extend([self._slope_sidewind])
+
+        # Publish the SnakeCommand
+        self.snake_command_pub.publish(self._snake_command)
+        self._last_sent = self._snake_command.command_name
+
+
+
     def joy_cb(self, msg):
         """Callback function for Joy messages
 
@@ -122,7 +319,7 @@ class JoystickTeleop(Node):
         """
 
         # Concatenate the axes and buttons state
-        self.joy_state = msg.axes + msg.buttons
+        self.joy_state = list(msg.axes) + list(msg.buttons)
 
         # Extract non-zero axes and buttons states
         index_array = np.nonzero(self.joy_state)[0]
@@ -242,10 +439,10 @@ class JoystickTeleop(Node):
             key (str): Identifier to track multiple throttled messages separately.
         """
         now = time.time()
-        last_time = self._last_warn_time.get(key, 0)
+        last_time = self._last_warn_time if self._last_warn_time is not None else 0
         if now - last_time >= period_sec:
             self.get_logger().info(msg)
-            self._last_warn_time[key] = now
+            self._last_warn_time = now
 
     def run(self):
         """Runs the JoystickTeleop Node"""
@@ -253,208 +450,18 @@ class JoystickTeleop(Node):
         # NOTE: Precision sidewinding - slower sidewind - check on U-snake and implement
         # NOTE: Amplitude manipulation not implemented for now - can add later if needed
 
-        rate = self.create_rate(self.loop_rate)
+        rate = self.create_rate(self._loop_rate)
 
         # Inform the user about the initial mode
         if not self._mode_logged:
             self.get_logger().info(f"Current mode: {self.current_mode.split('__')[1]}")
             self._mode_logged = True
 
-
-        speed_factor = 1
-        command = ""
+        self.speed_factor = 1
+        self.command = ""
 
         while rclpy.ok():
-
-            speed_multiplier = 1.0
-
-            ## Command processing logic ##
-            if self._mapped_command == "":
-                # If the mapped command is nothing, set the command to hold position
-                command = "hold_position"
-                speed_multiplier = 0.0
-
-                # Reset sidewind slope
-                self._slope_sidewind = self._slope_default
-
-            else:
-                # Otherwise process the input
-                self._command_list = self._mapped_command.split("__")
-
-                if self._command_list[0] == "mode":
-
-                    # For change to head look mode, cache the previous mode
-                    if self._command_list[1] == "head_look":
-                        self._prev_mode = self.current_mode
-                        self.current_mode = "mode__head_look"
-
-                        # Inform the user about the previous mode
-                        self.get_logger().info(f"Previous mode: {self._prev_mode.split('__')[1]}")
-
-                    # For other mode changes
-                    else:
-                        self._prev_mode = self.current_mode
-                        self.current_mode = self._command_list[0] + "__" + str(self._command_list[1])
-                    
-                    if self._command_list[1] == "pole_climb":
-                        command = "home"
-                    else:
-                        command = "hold_position"
-                        speed_multiplier = 0.0
-
-                    # Inform the user about the mode change
-                    self.get_logger().info(f"Current mode: {self.current_mode.split('__')[1]}")
-
-                    # Reset the mapped command to avoid multiple mode changes
-                    self._mapped_command = ""
-
-                elif self._command_list[0] == "head_look_exit":
-                    self.current_mode = self._prev_mode
-
-                    self.loginfo_throttle(5, f"Current mode: {self.current_mode.split('__')[1]}")
-
-                    command = self._command_list[0]
-                    speed_multiplier = 0.0
-
-                elif self._command_list[0] == "home":
-                    # Home position as defined in snakelib_control/param/snake_params.yaml
-                    command = self._command_list[0]
-                    speed_multiplier = 0.0
-                    speed_factor = 1
-                    self._has_pole_direction = False
-                    self._switch_flag = 0
-                    self._tightness = self._tightness_min
-                    self._pole_direction = 0
-                    self._slope_sidewind = self._slope_default
-
-                    # Reset the mode to normal mode
-                    self.current_mode = "mode__normal"
-
-                    # Inform the user about the mode change and home position only every 5 sec to avoid spamming the console
-                    self.loginfo_throttle(5, "Reset to Home position")
-                    self.loginfo_throttle(5, f"Current mode: {self.current_mode.split('__')[1]}")
-
-                elif self._command_list[0] == "g":
-                    # Set selected gait
-                    command = self._command_list[1]
-                    speed_multiplier = 1.0
-
-                    # Add the axes states only for head look gait
-                    if command == "head_look":
-                        # TODO: Remove the hardcoded values
-                        self._x_state, self._y_state = self.joy_state[2:4]
-
-                    if command == "head_look_ik":
-                        # TODO: Remove the hardcoded values
-                        (
-                            self._x_state,
-                            self._y_state,
-                            self._z_state,
-                            self._roll,
-                            self._pitch,
-                            self._yaw,
-                        ) = self.joy_state[:6]
-
-                    # Reset sidewind slope value if the selected gait is not conical_sidewinding
-                    if command != "conical_sidewinding":
-                        self._slope_sidewind = self._slope_default
-
-                    # Set _direction based on the joystick input for gaits mapped to buttons
-                    if self._command_list[2] == "plus":
-                        self._direction = 1
-                    elif self._command_list[2] == "minus":
-                        self._direction = -1
-
-                elif self._command_list[0] == "g_pole" and self._has_pole_direction:
-                    # Only set pole gait if pole direction is set
-                    command = self._command_list[1]
-                    speed_multiplier = 1.0
-
-                elif self._command_list[0] == "speed" and command != "hold_position" and command != "home":
-                    # Increase/decrease speed
-                    speed_factor += self._speed_step if self._command_list[1] == "plus" else -self._speed_step
-
-                    speed_factor = np.clip(speed_factor, self._speed_min, self._speed_max)
-
-                elif self._command_list[0] == "tightness" and self._has_pole_direction:
-                    # TODO: Add ability to just change tightness and not roll
-                    # Increase/decrease tightness
-                    self._tightness += self._tightness_step if self._command_list[1] == "plus" else -self._tightness_step
-
-                    self._tightness = np.clip(self._tightness, self._tightness_min, self._tightness_max)
-
-                    command = "rolling_helix"
-                    if self._last_sent != "rolling_helix":
-                        self._direction = 0
-
-                elif self._command_list[0] == "slope" and command == "conical_sidewinding":
-                    # Increase/decrease conical sidewinding slope
-                    self._slope_sidewind += self._slope_step if self._command_list[1] == "plus" else -self._slope_step
-
-                    self._slope_sidewind = np.clip(self._slope_sidewind, -self._slope_max, self._slope_max)
-
-                elif self._command_list[0] == "pole_direction":
-                    # Set command to pole direction
-                    command = self._command_list[0]
-
-                    # self._direction will be -1 for right curve and +1 for left curve
-                    self._pole_direction = self._direction
-
-                    # Reest the speed factor when starting pole climbing
-                    speed_factor = 1.0
-
-                    # Set the flag true to start pole climbing
-                    self._has_pole_direction = True
-
-                elif self._command_list[0] == "light_toggle":
-                    # Toggle light in snake head
-                    # self.declare_parameter('/led', False)
-                    self.declare_parameter('/led', Parameter.Type.BOOL)
-                    current_led = self.get_parameter("/led")
-                    self.set_parameters([Parameter('led', Parameter.Type.BOOL, not current_led)])
-
-                else:
-                    # Pass case for any other edge cases
-                    command = "hold_position"
-                    speed_multiplier = 0.0
-
-            ## Publish the command ##
-            # Calculate speed_multiplier
-            speed_multiplier *= self._direction * speed_factor
-
-            # Populate the SnakeCommand message
-            self._snake_command.command_name = command
-            self._snake_command.param_name = ["speed_multiplier"]
-            self._snake_command.param_value = [speed_multiplier]
-
-            # Add tightness and wt parameters only when pole climbing direction is set
-            if self._has_pole_direction:
-                self._snake_command.param_name.extend(["tightness", "pole_direction", "wt_direction"])
-                self._snake_command.param_value.extend([self._tightness, self._pole_direction, self._wt_dir])
-
-            # Add x & y state only when head look gait is selected
-            if command == "head_look":
-                self._snake_command.param_name.extend(["x_state", "y_state"])
-                self._snake_command.param_value.extend([self._x_state, self._y_state])
-
-            # Add x, y, z, pitch & yaw states only when inverse kinematics based head look gait is selected
-            if command == "head_look_ik":
-                self._snake_command.param_name.extend(["x_state", "y_state", "z_state"])
-                self._snake_command.param_name.extend(["roll", "pitch", "yaw"])
-                self._snake_command.param_value.extend([self._roll, self._pitch, self._yaw])
-                self._snake_command.param_value.extend([self._x_state, self._y_state, self._z_state])
-
-            # Add slope parameter only when conical_sidewinding gait is selected
-            if command == "conical_sidewinding":
-                self._snake_command.param_name.extend(["slope"])
-                self._snake_command.param_value.extend([self._slope_sidewind])
-
-            # Publish the SnakeCommand
-            self.snake_command_pub.publish(self._snake_command)
-            self._last_sent = self._snake_command.command_name
-
-            rclpy.spin_once(self)
-            rate.sleep()
+            rclpy.spin(self)
 
 
 

@@ -6,9 +6,11 @@ import time
 from rclpy.parameter import Parameter
 from snakelib_msgs.msg import HebiSensors
 from rclpy.executors import ExternalShutdownException
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
-
-from hebi_interface import HEBIROSWrapper
+from snakelib_hebi.hebi_interface import HEBIROSWrapper
 
 class HEBISensingROSWrapper(HEBIROSWrapper):
     """Driver node that publishes sensor (joint angle, joint velocity, effort, linear acceleration,
@@ -32,16 +34,19 @@ class HEBISensingROSWrapper(HEBIROSWrapper):
         self.loop_rate = self.feedback_frequency
         self.robot_feedback = hebi.GroupFeedback(self.num_modules)
 
-        # With default values, don't use if launching through a launch file
-        # self.declare_parameter('snake_type', "REU")
-        # self.declare_parameter(self.get_parameter("/snake_type") + "/max_torque", 1.5)
-        # self.declare_parameter(self.get_parameter('snake_type').value + "/zero_offset", [0.0, 0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-        self.declare_parameter('snake_type', Parameter.Type.STRING)
-        self.declare_parameter(self.get_parameter("/snake_type") + "/max_torque", Parameter.Type.DOUBLE)
-        self.declare_parameter(self.get_parameter('snake_type').value + "/zero_offset", Parameter.Type.DOUBLE_ARRAY)
+        params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'snake_params.yaml')
         
-        self._zero_offset = self.get_parameter(self.get_parameter("/snake_type") + "/zero_offset", np.zeros(self.num_modules))
+        with open(params_path1, "r") as file:
+            data = yaml.safe_load(file)
+
+        params_path2 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+        with open(params_path2, "r") as file:
+            self._snake_type = yaml.safe_load(file).get("snake_type")
+        
+        self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
+
+        self._zero_offset = self._snake_param.get("zero_offset")
     
     def run_loop(self):
         r"""Send commands regularly until shutdown."""
@@ -57,22 +62,23 @@ class HEBISensingROSWrapper(HEBIROSWrapper):
         # Populate hebi sensors message with feedback.
         self.hebi_sensors.header.stamp = self.get_clock().now().to_msg()
         self.hebi_sensors.name = self.module_names
-        self.hebi_sensors.position = feedback["position"]
-        self.hebi_sensors.velocity = feedback["velocity"]
-        self.hebi_sensors.effort = feedback["effort"]
+        self.hebi_sensors.position = list(map(float, feedback["position"]))
+        self.hebi_sensors.velocity = list(map(float, feedback["velocity"]))
+        self.hebi_sensors.effort = list(map(float, feedback["effort"]))
 
-        self.hebi_sensors.lin_acc.x = feedback["lin_acc"][:, 0]
-        self.hebi_sensors.lin_acc.y = feedback["lin_acc"][:, 1]
-        self.hebi_sensors.lin_acc.z = feedback["lin_acc"][:, 2]
+        self.hebi_sensors.lin_acc.x = list(map(float, feedback["lin_acc"][:, 0]))
+        self.hebi_sensors.lin_acc.y = list(map(float, feedback["lin_acc"][:, 1]))
+        self.hebi_sensors.lin_acc.z = list(map(float, feedback["lin_acc"][:, 2]))
 
-        self.hebi_sensors.ang_vel.x = feedback["ang_vel"][:, 0]
-        self.hebi_sensors.ang_vel.y = feedback["ang_vel"][:, 1]
-        self.hebi_sensors.ang_vel.z = feedback["ang_vel"][:, 2]
 
-        self.hebi_sensors.orientation.x = feedback["orientation"][:, 0]
-        self.hebi_sensors.orientation.y = feedback["orientation"][:, 1]
-        self.hebi_sensors.orientation.z = feedback["orientation"][:, 2]
-        self.hebi_sensors.orientation.w = feedback["orientation"][:, 3]
+        self.hebi_sensors.ang_vel.x = list(map(float, feedback["ang_vel"][:, 0]))
+        self.hebi_sensors.ang_vel.y = list(map(float, feedback["ang_vel"][:, 1]))
+        self.hebi_sensors.ang_vel.z = list(map(float, feedback["ang_vel"][:, 2]))
+
+        self.hebi_sensors.orientation.x = list(map(float, feedback["orientation"][:, 0]))
+        self.hebi_sensors.orientation.y = list(map(float, feedback["orientation"][:, 1]))
+        self.hebi_sensors.orientation.z = list(map(float, feedback["orientation"][:, 2]))
+        self.hebi_sensors.orientation.w = list(map(float, feedback["orientation"][:, 3]))
 
         self.joint_state.header = self.hebi_sensors.header
         self.joint_state.name = self.module_names

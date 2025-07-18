@@ -4,6 +4,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution, TextSubstitution
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
+from launch.substitutions import PythonExpression
 
 def generate_launch_description():
     # Declare launch arguments
@@ -18,7 +19,9 @@ def generate_launch_description():
         description='Number of modules'
     )
 
-    snake_type = LaunchConfiguration('snake_type')
+    # TODO: Load from a param file 
+    snake_name = "REU"
+
     num_modules = LaunchConfiguration('num_modules')
 
     # Paths
@@ -29,17 +32,12 @@ def generate_launch_description():
     # Param files
     snake_params_file = os.path.join(snakelib_control_dir, 'param', 'snake_params.yaml')
 
-    # Build the xacro command to generate URDF dynamically
-    xacro_file_path = PathJoinSubstitution([
-        snakelib_description_dir,
-        TextSubstitution(text=''),  # for snake_type folder, will be replaced by snake_type
-        TextSubstitution(text=''),  # workaround, replaced below
-    ])
+    file_path = f"{snake_name}_snake/{snake_name}_snake.xacro"
 
-    # Instead of the above, use a dynamic PathJoinSubstitution with snake_type
-    urdf_dir = PathJoinSubstitution([snakelib_description_dir, snake_type + '_snake'])
-    xacro_file = PathJoinSubstitution([urdf_dir, snake_type + '_snake.xacro'])
-    urdf_output_file = PathJoinSubstitution([urdf_dir, snake_type + '_instance.urdf'])
+    xacro_file = PathJoinSubstitution([
+        snakelib_description_dir,
+        file_path
+    ])
 
     # Run xacro to generate URDF at launch time:
     robot_description_content = Command([
@@ -54,10 +52,10 @@ def generate_launch_description():
 
         # Parameters that were <param> tags in ROS1
         # snake_type param
-        Node(
-            package='rclpy', executable='parameter_bridge', output='screen',  # dummy node, optional
-            parameters=[{'snake_type': snake_type}]
-        ),
+        # Node(
+        #     package='rclpy', executable='parameter_bridge', output='screen',  # dummy node, optional
+        #     parameters=[{'snake_type': snake_type}]
+        # ),
 
         # joystick_name param as parameter to relevant nodes
         # We'll add joystick_name param explicitly to joy node below

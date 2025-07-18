@@ -3,15 +3,19 @@ from sensor_msgs.msg import JointState
 import rclpy
 from rclpy.node import Node
 
-from snakelib_control.gaitlib_controller import GaitlibController
-from snakelib_control.go_to_position_controller import GoToPositionController
-from snakelib_control.watchdog import Watchdog
 from snakelib_msgs.msg import HebiSensors, SnakeCommand
 from rclpy.executors import ExternalShutdownException
 from rclpy.parameter import Parameter
 from rclpy.task import Future
 import time
 
+from snakelib_control.scripts.gaitlib_controller import GaitlibController
+from snakelib_control.scripts.go_to_position_controller import GoToPositionController
+from snakelib_control.scripts.watchdog import Watchdog
+
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class CommandManager(Node):
     """Manages commands and dispatches different controllers for running the robot
@@ -27,35 +31,36 @@ class CommandManager(Node):
 
     def __init__(self, **kwargs):
         """Initializes the CommandManager"""
-        super.init("command_manager" ,**kwargs)
+        super().__init__("command_manager" ,**kwargs)
 
-        self.declare_parameter("snake_type", "REU")
-        self.declare_parameter("snake_type", Parameter.Type.STRING)
-        self._snake_type = self.get_parameter("snake_type", "REU")
-
-
-        self.declare_parameter(f"{self._snake_type.module_names}", Parameter.Type.STRING_ARRAY) # default : []
-        self.declare_parameter(f"{self._snake_type.home}", Parameter.Type.DOUBLE_ARRAY) # default : np.zeros(len(self._module_names))
-        self.declare_parameter("commmand_manager_frequency", Parameter.Type.DOUBLE) # default : 100.0
-        self.declare_parameter("sensors_watchdog_rate", Parameter.Type.DOUBLE) # default : 5.0
+        params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'snake_params.yaml')
         
-        self._module_names = self.get_parameter(f"{self._snake_type.module_names}")
+        with open(params_path1, "r") as file:
+            data = yaml.safe_load(file)
+
+        params_path2 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+        with open(params_path2, "r") as file:
+            self._snake_type = yaml.safe_load(file).get("snake_type")
+        
+        self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
+        self._module_names = self._snake_param.get("module_names")
 
         self._snake_command = SnakeCommand()  # the last received snake command
-        self._loop_rate = self.get_parameter("commmand_manager_frequency")  # Hz, loop rate in Hz for the run() function
+        self._loop_rate = data.get("command_manager").get("ros__parameters").get("command_manager_frequency")  # Hz, loop rate in Hz for the run() function
 
         # Rate in Hz at which sensor data must be received before watchdog is timed out
-        self._sensors_watchdog_rate = self.get_parameter("sensors_watchdog_rate")
+        self._sensors_watchdog_rate = data.get("command_manager").get("ros__parameters").get("sensors_watchdog_rate")
 
         # Store the home configuration
         self._home_joint_state = JointState()
         self._home_joint_state.name = self._module_names
-        self._home_joint_state.position = self.get_parameter(f"{self._snake_type.home}")
+        self._home_joint_state.position = self._snake_param.get("home")
 
         # Subscriber that listens for SnakeCommand messages
         self._snake_command_sub = self.create_subscription(
             SnakeCommand,
-            "snake/command",
+            "/snake/command",
             self.snake_command_cb,
             10)
         self._snake_command_sub  # prevent unused variable warning
@@ -63,7 +68,7 @@ class CommandManager(Node):
         # Subscribes to the current joint state from hardware or simulation
         self._joint_state_sub = self.create_subscription(
             JointState,
-            "snake/joint_states",
+            "/snake/joint_states",
             self.joint_state_cb,
             10)
         self._joint_state_sub  # prevent unused variable warning
@@ -88,14 +93,14 @@ class CommandManager(Node):
 
         # TODO: Try to move create arc in GaitlibController
         # Pole climb arc parameters
-        self.declare_parameter(f"{self._snake_type}.pole_climb.arc_beta", Parameter.Type.DOUBLE) # default : 0.3
-        self.declare_parameter(f"{self._snake_type}.pole_climb.imu_dir", Parameter.Type.INTEGER) # default : 1
-        self._arc_beta = self.get_parameter(f"{self._snake_type}.pole_climb.arc_beta")
-        self._imu_dir = self.get_parameter(f"{self._snake_type}.pole_climb.imu_dir")
+        self._arc_beta = self._snake_param.get("gait_params").get("pole_climb").get("arc_beta")
+        self._imu_dir = self._snake_param.get("gait_params").get("pole_climb").get("imu_dir")
 
-        # TODO: watchdog likely doesn't work so using the following hack.
-        self.wait_for_message("snake/joint_states", JointState)
-
+        self.joint_states_received = False
+        while not self.joint_states_received:
+            rclpy.spin_once(self)
+            time.sleep(0.1)
+        
         num_modules = len(self._module_names)
         self._prev_cmd = self._desired_joint_state = JointState(position=[], velocity=[np.nan] * num_modules, effort=[np.nan] * num_modules)
 
@@ -108,6 +113,13 @@ class CommandManager(Node):
         # Default to holding position in home joint state
         self._controller = GoToPositionController(self._snake_type, self._home_joint_state.position, self._current_joint_state)
 
+        timer_period = 1.0 / self._loop_rate
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+
+        self._last_warn_time = None
+
+
+
     def snake_command_cb(self, msg):
         """Callback function for SnakeCommand messages
 
@@ -118,7 +130,7 @@ class CommandManager(Node):
         Args:
             msg: SnakeCommand message received by the subscriber.
         """
-
+        self.get_logger().info(msg.command_name)
         self._snake_command = msg
 
     def joint_state_cb(self, msg):
@@ -130,6 +142,9 @@ class CommandManager(Node):
 
         self._sensors_watchdog.trigger()
         self._current_joint_state = msg
+        if self.joint_states_received==False:
+            self.get_logger().info(f"Joint State Initalised.")
+        self.joint_states_received=True
 
     def hebi_sensor_cb(self, msg):
         """HEBI sensor callback function.
@@ -276,8 +291,7 @@ class CommandManager(Node):
                 self._controller = GaitlibController(
                     self._snake_type,
                     self._current_joint_state,
-                    self._elapsed_snake_time,
-                    self
+                    self._elapsed_snake_time
                 )
             if cmd_name == "head_look":
                 # Pass head accelerations as a gait param.
@@ -306,31 +320,25 @@ class CommandManager(Node):
             self._controller._last_time = self._current_joint_state.header.stamp
 
         return self._desired_joint_state
+    
+    def timer_callback(self):
+        if not self._sensors_watchdog.timed_out():
+            self.manage_last_command()
+            desired_joint_state = self.get_next_cmd()
+            self._joint_state_pub.publish(desired_joint_state)
+            self._prev_cmd = desired_joint_state
+        else:
+            self.logwarn_throttle(0.25, "Sensor watchdog time exceeded. Joint commands not sent.")
+
+
 
     def run(self):
-        """Main function that runs in a loop to run the robot."""
-
-        rate = self.create_rate(self.loop_rate)
-
+        """Main function that runs the robot."""
         self.get_logger().info("Running CommandManager")
-        while rclpy.ok():
+        rclpy.spin(self) # Once spinning starts, timer_callback gets called
 
-            if not self._sensors_watchdog.timed_out():
-                self.manage_last_command()
 
-                desired_joint_state = self.get_next_cmd()
-
-                self._joint_state_pub.publish(desired_joint_state)
-
-                # Keep track of last command for hold_position
-                self._prev_cmd = desired_joint_state
-
-            else:
-                self.logwarn_throttle(0.25, "Sensor watchdog time exceeded. Joint commands not sent.")
-            rclpy.spin_once(self)
-            rate.sleep()
-
-    def logwarn_throttle(self, period_sec: float, msg: str, key='default'):
+    def logwarn_throttle(self, period_sec: float, msg: str):
         """
         Logs a warning message at most once every `period_sec` seconds.
 
@@ -340,23 +348,10 @@ class CommandManager(Node):
             key (str): Identifier to track multiple throttled messages separately.
         """
         now = time.time()
-        last_time = self._last_warn_time.get(key, 0)
+        last_time = self._last_warn_time if self._last_warn_time is not None else 0
         if now - last_time >= period_sec:
             self.get_logger().warn(msg)
-            self._last_warn_time[key] = now
-
-
-    def wait_for_message(self, topic, msg_type):
-        future = Future()
-
-        def callback(msg):
-            future.set_result(msg)
-            sub.destroy()  # Unsubscribe once we get the message
-
-        sub = self.create_subscription(msg_type, topic, callback, 10)
-        rclpy.spin_until_future_complete(self, future)
-        
-        return future.result()
+            self._last_warn_time = now
 
 
     @property
@@ -371,7 +366,6 @@ class CommandManager(Node):
 def main():
     rclpy.init()
     command_manager = CommandManager()
-
     try:
         command_manager.run()
     except (ExternalShutdownException, KeyboardInterrupt):

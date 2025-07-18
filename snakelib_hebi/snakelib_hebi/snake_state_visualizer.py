@@ -15,6 +15,9 @@ from std_msgs.msg import ColorRGBA, Header
 from tf2_ros import StaticTransformBroadcaster
 
 from snakelib_control.utils import JOINT_NAMES, Robot
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class SnakeStateVisualizer(Node):
     def __init__(self, **kwargs):
@@ -40,30 +43,19 @@ class SnakeStateVisualizer(Node):
         self.update_joint_state = JointState()
         self.pub_joint_state = JointState()
 
-        # If parameters are not launched through launch files, use below declaration with default values
-        # self.declare_parameter("snake_type", "REU")
-        # self.declare_parameter(self.get_parameter("snake_type")+"/module_names", ['RUB-013',
-        #                                                                           'RUB-020',
-        #                                                                           'RUB-019',
-        #                                                                           'RUB_001',
-        #                                                                           'RUB_009',
-        #                                                                           'RUB-021',
-        #                                                                           'RUB_015',
-        #                                                                           'RUB_002',
-        #                                                                           'RUB_004',
-        #                                                                           'RUB-006',
-        #                                                                           'RUB_003',
-        #                                                                           'RUB_010',
-        #                                                                           'RUB_008',
-        #                                                                           'RUB_012',
-        #                                                                           'RUB_016',
-        #                                                                           'RUB_017'])
+        params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'snake_params.yaml')
+        
+        with open(params_path1, "r") as file:
+            data = yaml.safe_load(file)
 
-        self.declare_parameter("snake_type", Parameter.Type.STRING)
-        self.declare_parameter(self.get_parameter("snake_type")+"/module_names", Parameter.Type.STRING_ARRAY)        
-
-        self.snake_type = self.get_parameter("snake_type")
-        self.num_modules = len(self.get_parameter(self.snake_type + "/module_names"))
+        params_path2 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+        with open(params_path2, "r") as file:
+            self.snake_type = yaml.safe_load(file).get("snake_type")
+        
+        self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
+        
+        self.num_modules = len(self._snake_param.get("module_names"))
 
         self.update_joint_state.name = JOINT_NAMES[self.snake_type][: self.num_modules]
         self.pub_joint_state.name = JOINT_NAMES[self.snake_type][: self.num_modules]

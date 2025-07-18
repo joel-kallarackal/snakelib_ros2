@@ -1,7 +1,7 @@
 import numpy as np
 from sensor_msgs.msg import JointState
 
-from snakelib_control.abstract_controller import AbstractController
+from snakelib_control.scripts.abstract_controller import AbstractController
 
 
 class GoToPositionController(AbstractController):
@@ -29,7 +29,7 @@ class GoToPositionController(AbstractController):
         # How far into the transition we've progressed, where 0 is no progress, 1 is transition complete
         self._transition_progress = 0.0
 
-        self._last_time = current_joint_state.header.stamp  # used to keep track of actual elapsed time
+        self._last_time = current_joint_state.header.stamp.nanosec  # used to keep track of actual elapsed time
 
         # Total "snake time" in seconds to take when transitioning between gaits
         self._transition_time = self._snake_param.get("go_to_position_controller", {}).get("transition_time", 1.5)
@@ -54,8 +54,11 @@ class GoToPositionController(AbstractController):
         """Overrides AbstractController.update. Simply returns desired go_to joint state."""
 
         # Get the time from the joint state header and update snake time
-        current_time = current_joint_state.header.stamp
+        current_time = current_joint_state.header.stamp.nanosec
+        current_time = current_time if isinstance(current_time, int) else current_time.nanosec
+        self._last_time = self._last_time if isinstance(self._last_time, int) else self._last_time.nanosec
         dt = current_time - self._last_time
+
         self._last_time = current_time
         num_modules = len(current_joint_state.name)
         transition_mask = exiting_head_look * np.array([0] * n_exiting_modules + [1.0] * (num_modules - n_exiting_modules))
@@ -71,15 +74,15 @@ class GoToPositionController(AbstractController):
         )
 
         # Update transition progress
-        self._transition_progress += np.abs(dt.to_sec()) / self._transition_time
+        self._transition_progress += np.abs(dt*1e-9) / self._transition_time
         self._transition_progress = min(self._transition_progress, 1.0)
 
         desired_joint_state = JointState()
         desired_joint_state.name = self._module_names
-        desired_joint_state.position = desired_joint_angles
+        desired_joint_state.position = list(desired_joint_angles)
 
         # HEBI API requires NaNs to ignore velocity and effort values
-        desired_joint_state.velocity = np.array([np.nan] * len(self._go_to_joint_angles))
-        desired_joint_state.effort = np.array([np.nan] * len(self._go_to_joint_angles))
+        desired_joint_state.velocity = list(np.array([np.nan] * len(self._go_to_joint_angles)))
+        desired_joint_state.effort = list(np.array([np.nan] * len(self._go_to_joint_angles)))
 
         return desired_joint_state

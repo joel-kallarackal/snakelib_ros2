@@ -6,7 +6,11 @@ from sensor_msgs.msg import JointState
 import time
 from rclpy.parameter import Parameter
 
-from hebi_interface import HEBIROSWrapper
+from snakelib_hebi.hebi_interface import HEBIROSWrapper
+
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class HEBIControlROSWrapper(HEBIROSWrapper):
     r"""Driver node that commands targets to the HEBI modules from the `joint_command` topic."""
@@ -26,16 +30,19 @@ class HEBIControlROSWrapper(HEBIROSWrapper):
         # Initialize command message buffer.
         self.robot_cmd = hebi.GroupCommand(self.num_modules)
 
-        # With default values, don't use if launching through a launch file
-        # self.declare_parameter('snake_type', "REU")
-        # self.declare_parameter(self.get_parameter("/snake_type") + "/max_torque", 1.5)
-        # self.declare_parameter(self.get_parameter('snake_type').value + "/zero_offset", [0.0, 0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-        self.declare_parameter('snake_type', Parameter.Type.STRING)
-        self.declare_parameter(self.get_parameter("/snake_type") + "/max_torque", Parameter.Type.DOUBLE)
-        self.declare_parameter(self.get_parameter('snake_type').value + "/zero_offset", Parameter.Type.DOUBLE_ARRAY)
+        params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'snake_params.yaml')
         
-        self._zero_offset = self.get_parameter(self.get_parameter('snake_type').value + "/zero_offset")
+        with open(params_path1, "r") as file:
+            data = yaml.safe_load(file)
+
+        params_path2 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+        with open(params_path2, "r") as file:
+            self._snake_type = yaml.safe_load(file).get("snake_type")
+        
+        self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
+        
+        self._zero_offset = self._snake_param.get("zero_offset")
         if self._zero_offset == '':
             self._zero_offset = None
 
@@ -83,7 +90,7 @@ class HEBIControlROSWrapper(HEBIROSWrapper):
             self.robot_cmd.position = np.subtract(self.robot_cmd.position, tuple(self._zero_offset))
 
         # Set max and min effort limits
-        effort_limit = self.get_parameter(self.get_parameter("/snake_type") + "/max_torque")
+        effort_limit = self._snake_param.get("max_torque")
         if effort_limit=='': # Setting default value
             effort_limit=1.5
 

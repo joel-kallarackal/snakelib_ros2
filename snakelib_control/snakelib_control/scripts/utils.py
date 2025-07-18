@@ -4,13 +4,15 @@ from typing import Dict
 from warnings import warn
 
 import numpy as np
-from pykdl_utils.kdl_kinematics import create_kdl_kin
+from snakelib_control.pykdl_utils.kdl_kinematics import create_kdl_kin
+
+from ament_index_python.packages import get_package_share_directory
 
 ROBOT_CFGS = dict(
     urdf_path=dict(
-        REU="snakelib_description/REU_snake/REU_instance.urdf",
-        SEA="snakelib_description/SEA_snake/SEA_instance.urdf",
-        RSNAKE="snakelib_description/RSNAKE_snake/RSNAKE_instance.urdf",
+        REU="REU_snake/REU_instance.urdf",
+        SEA="SEA_snake/SEA_instance.urdf",
+        RSNAKE="RSNAKE_snake/RSNAKE_instance.urdf",
     ),
     base_link=dict(
         REU="kdl_dummy_root",
@@ -58,7 +60,7 @@ class Robot:
             full_robot (bool, optional): Initialize all links of just some of them.
         """
         print(num_modules)
-        self.urdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../", cfgs["urdf_path"][robot_name]))
+        self.urdf_path = os.path.join(get_package_share_directory('snakelib_description'), cfgs["urdf_path"][robot_name])
         self.links = LINK_NAMES[robot_name][:num_modules]
         self.base_link = cfgs["base_link"][robot_name]
         if full_robot:
