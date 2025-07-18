@@ -52,6 +52,4 @@ Type=Application
 Categories=Development;
 EOF
 
-chmod +x ~/.local/share/applications/snake_app.sh
-
 echo "Setup complete."
