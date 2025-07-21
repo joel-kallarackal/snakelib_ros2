@@ -62,7 +62,7 @@ class CommandManager(Node):
             SnakeCommand,
             "/snake/command",
             self.snake_command_cb,
-            10)
+            100)
         self._snake_command_sub  # prevent unused variable warning
 
         # Subscribes to the current joint state from hardware or simulation
@@ -81,7 +81,7 @@ class CommandManager(Node):
         self._hebi_sensor_sub  # prevent unused variable warning
         
         # Publishes the desired joint state provided by the current running controller
-        self._joint_state_pub = self.create_publisher(JointState, 'snake/joint_commands', 10)
+        self._joint_state_pub = self.create_publisher(JointState, 'snake/joint_commands', 100)
         
         """Sensor watchdog prevents a command from being sent until the current joint
         state is updated, so initialization of _current_joint_state does not matter, but
@@ -130,7 +130,6 @@ class CommandManager(Node):
         Args:
             msg: SnakeCommand message received by the subscriber.
         """
-        self.get_logger().info(msg.command_name)
         self._snake_command = msg
 
     def joint_state_cb(self, msg):
@@ -144,7 +143,7 @@ class CommandManager(Node):
         self._current_joint_state = msg
         if self.joint_states_received==False:
             self.get_logger().info(f"Joint State Initalised.")
-        self.joint_states_received=True
+            self.joint_states_received=True
 
     def hebi_sensor_cb(self, msg):
         """HEBI sensor callback function.
@@ -316,9 +315,16 @@ class CommandManager(Node):
                 )
             else:
                 self._desired_joint_state = self._controller.update(self._current_joint_state)
+
+                # Debug
+                # self.get_logger().info("Current : "+ str(self._current_joint_state.position[1]))
+                # self.get_logger().info("Desired : "+ str(self._desired_joint_state.position[1]))
+
         else:
             self._controller._last_time = self._current_joint_state.header.stamp
 
+        # Debug
+        # self.get_logger().info(str(self._desired_joint_state.position[1]))
         return self._desired_joint_state
     
     def timer_callback(self):

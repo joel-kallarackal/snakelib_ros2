@@ -9,6 +9,7 @@ from rclpy.executors import ExternalShutdownException
 import yaml
 import os
 from ament_index_python.packages import get_package_share_directory
+import time
 
 from snakelib_hebi.hebi_interface import HEBIROSWrapper
 
@@ -61,6 +62,9 @@ class HEBISensingROSWrapper(HEBIROSWrapper):
 
         # Populate hebi sensors message with feedback.
         self.hebi_sensors.header.stamp = self.get_clock().now().to_msg()
+        # t = time.time()
+        # self.hebi_sensors.header.stamp.sec = int(t)
+        # self.hebi_sensors.header.stamp.nanosec = int(t*1e9)
         self.hebi_sensors.name = self.module_names
         self.hebi_sensors.position = list(map(float, feedback["position"]))
         self.hebi_sensors.velocity = list(map(float, feedback["velocity"]))

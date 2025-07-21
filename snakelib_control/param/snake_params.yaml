@@ -73,13 +73,13 @@ command_manager:
                 rolling:
                     beta_even: 0.0
                     beta_odd: 0.0
-                    A_even: 0.3
-                    A_odd: 0.3
+                    A_even: 0.5
+                    A_odd: 0.5
                     wS_even: 0
                     wS_odd: 0
-                    wT_even: -4.0
-                    wT_odd: -4.0
-                    delta: 1.57079632679 #pi/2
+                    wT_even: 4.0
+                    wT_odd: 4.0
+                    delta: -1.57079632679 #pi/2
                     speed_multiplier: 2
                 rolling_in_shape:
                     wT_even: 3.0

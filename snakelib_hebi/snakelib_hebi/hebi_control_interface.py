@@ -65,8 +65,12 @@ class HEBIControlROSWrapper(HEBIROSWrapper):
 
     def send_joint_commands(self):
         r"""Sends joint commands to the module."""
+
+        # Debug
+        # self.get_logger().info(str(self.robot_cmd.position[1]))
+        
         if np.isnan(self.robot_cmd.position).any() and np.isnan(self.robot_cmd.velocity).any() and np.isnan(self.robot_cmd.effort).any():
-            self.logwarn_throttle(100, "No joint command sent.")
+            self.logwarn_throttle(1, "No joint command sent.") # 100
             return
 
         self.robot.send_command(self.robot_cmd)

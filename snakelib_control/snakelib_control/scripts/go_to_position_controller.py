@@ -29,7 +29,7 @@ class GoToPositionController(AbstractController):
         # How far into the transition we've progressed, where 0 is no progress, 1 is transition complete
         self._transition_progress = 0.0
 
-        self._last_time = current_joint_state.header.stamp.nanosec  # used to keep track of actual elapsed time
+        self._last_time = current_joint_state.header.stamp.sec + current_joint_state.header.stamp.nanosec*(1e-9)  # used to keep track of actual elapsed time
 
         # Total "snake time" in seconds to take when transitioning between gaits
         self._transition_time = self._snake_param.get("go_to_position_controller", {}).get("transition_time", 1.5)
@@ -54,9 +54,9 @@ class GoToPositionController(AbstractController):
         """Overrides AbstractController.update. Simply returns desired go_to joint state."""
 
         # Get the time from the joint state header and update snake time
-        current_time = current_joint_state.header.stamp.nanosec
-        current_time = current_time if isinstance(current_time, int) else current_time.nanosec
-        self._last_time = self._last_time if isinstance(self._last_time, int) else self._last_time.nanosec
+        current_time = current_joint_state.header.stamp.sec + current_joint_state.header.stamp.nanosec*(1e-9)
+        current_time = current_time if isinstance(current_time, float) else current_time.nanosec + current_time.nanosec*(1e-9)
+        self._last_time = self._last_time if isinstance(self._last_time, float) else self._last_time.nanosec + self._last_time.nanosec*(1e-9)
         dt = current_time - self._last_time
 
         self._last_time = current_time
@@ -74,7 +74,7 @@ class GoToPositionController(AbstractController):
         )
 
         # Update transition progress
-        self._transition_progress += np.abs(dt*1e-9) / self._transition_time
+        self._transition_progress += np.abs(dt) / self._transition_time
         self._transition_progress = min(self._transition_progress, 1.0)
 
         desired_joint_state = JointState()

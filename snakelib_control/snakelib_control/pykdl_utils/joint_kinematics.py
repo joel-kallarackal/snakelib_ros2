@@ -160,7 +160,7 @@ class JointKinematics(JointKinematicsBase, Node):
         start_time = self.get_clock().now().nanoseconds / 1e9
         rate = self.create_rate(100)
 
-        while rclpy.ok() and (self.get_clock().now().nanoseconds / 1e9 - start_time) < timeout:
+        while rclpy.ok() and ((self.get_clock().now().nanoseconds / 1e9) - start_time) < timeout:
             if self._joint_efforts is not None:
                 return True
             rclpy.spin_once(self, timeout_sec=0.01)

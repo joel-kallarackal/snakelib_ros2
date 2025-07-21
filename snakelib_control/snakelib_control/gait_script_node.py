@@ -16,7 +16,7 @@ def main():
     try:
         rclpy.init()
         node = Node("gait_script_node")
-        pub = node.create_publisher(SnakeCommand, 'snake/command', 10)
+        pub = node.create_publisher(SnakeCommand, 'snake/command', 100)
         
         loop_rate = 10
         rate = node.create_rate(loop_rate)
