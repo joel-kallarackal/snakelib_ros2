@@ -217,6 +217,7 @@ class GaitlibController(AbstractController):
 
         # Potentially refactor headlook as a seperate class of controller.
         headlook_multiplier = 0 if self._desired_gait == "head_look" else 1
+        headlook_multiplier = 0 if self._desired_gait == "head_look_ik" else 1
 
         current_time = current_time if isinstance(current_time, float) else current_time.sec + current_time.nanosec*(1e-9)
         self._last_time = self._last_time if isinstance(self._last_time, float) else self._last_time.sec + self._last_time.nanosec*(1e-9)
@@ -238,7 +239,7 @@ class GaitlibController(AbstractController):
             * self._transition_progress,
         )
 
-        if self._desired_gait == "head_look":
+        if self._desired_gait == "head_look" or self._desired_gait == "head_look_ik":
             joint_angles = desired_gait_joint_angles
 
         # Update transition progress

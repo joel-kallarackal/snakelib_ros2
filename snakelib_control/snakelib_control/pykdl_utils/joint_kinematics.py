@@ -329,7 +329,7 @@ def main():
         print("End effector force:", js_kin.end_effector_force())
 
         if True:
-            import tf
+            import tf_transformations as tf
             from hrl_geom.pose_converter import PoseConv
             import time
 

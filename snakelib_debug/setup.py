@@ -1,8 +1,6 @@
 from setuptools import find_packages, setup
-import os
-from glob import glob
 
-package_name = 'snakelib_gui'
+package_name = 'snakelib_debug'
 
 setup(
     name=package_name,
@@ -12,20 +10,17 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name, 'param'), glob('param/*.py')),
-        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.py')),
     ],
-    install_requires=['setuptools','snakelib_srvs'],
+    install_requires=['setuptools'],
     zip_safe=True,
     maintainer='joel',
     maintainer_email='joelgeorgekal@gmail.com',
     description='TODO: Package description',
-    license='Apache-2.0',
+    license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'SnakeLib_GUI = snakelib_gui.SnakeLib_GUI:main'
+            'test_controls = snakelib_debug.test_controls:main'
         ],
     },
 )

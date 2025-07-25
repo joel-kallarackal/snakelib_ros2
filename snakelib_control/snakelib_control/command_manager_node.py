@@ -1,5 +1,6 @@
 import numpy as np
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Pose
 import rclpy
 from rclpy.node import Node
 
@@ -12,6 +13,7 @@ import time
 from snakelib_control.scripts.gaitlib_controller import GaitlibController
 from snakelib_control.scripts.go_to_position_controller import GoToPositionController
 from snakelib_control.scripts.watchdog import Watchdog
+from tf_transformations import euler_from_quaternion
 
 import yaml
 import os
@@ -79,10 +81,17 @@ class CommandManager(Node):
             self.hebi_sensor_cb,
             10)
         self._hebi_sensor_sub  # prevent unused variable warning
+
+        self._head_state_sub = self.create_subscription(
+            Pose,
+            "/snake/head_state",
+            self.head_state_cb,
+            10)
+        self._head_state_sub  # prevent unused variable warning
         
         # Publishes the desired joint state provided by the current running controller
         self._joint_state_pub = self.create_publisher(JointState, 'snake/joint_commands', 100)
-        
+
         """Sensor watchdog prevents a command from being sent until the current joint
         state is updated, so initialization of _current_joint_state does not matter, but
         for additional safety we set it to the home joint state.
@@ -118,7 +127,21 @@ class CommandManager(Node):
 
         self._last_warn_time = None
 
+        self.head_acc_x_before_rolling = 0
+        self.head_acc_y_before_rolling = -9.6
+        self.direction=1
 
+        self.head_state = [0, 0, 0, -np.pi, 0, 0]
+
+    def head_state_cb(self, msg):
+        self.head_state[0] = msg.position.x
+        self.head_state[1] = msg.position.y
+        self.head_state[2] = msg.position.z
+
+        roll, pitch, yaw = euler_from_quaternion([msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
+        self.head_state[3] = roll
+        self.head_state[4] = pitch
+        self.head_state[5] = yaw
 
     def snake_command_cb(self, msg):
         """Callback function for SnakeCommand messages
@@ -196,8 +219,9 @@ class CommandManager(Node):
         module_flip[1::2] *= -1
         arc_angles[module_offset::2] = inverted_module * pole_direction * beta * module_flip
 
-        self._pole_climb_start_angles = arc_angles
+        self._pole_climb_start_angles = arc_angles*2
         self._pole_direction_initialized = True
+    
 
     def start_head_look(self):
         """Runs initialization for starting head look.
@@ -234,26 +258,30 @@ class CommandManager(Node):
 
     def manage_last_command(self):
         """Read the last received command and update controller based on that command."""
-
         self._cmd_name = cmd_name = self._snake_command.command_name
 
         if cmd_name == "head_look" or cmd_name == "head_look_ik":
             if self._just_started_head_look:
                 self.start_head_look()
-            self._n_exiting_modules = 6 if "ik" in cmd_name else 2
+            # self._n_exiting_modules = 6 if "ik" in cmd_name else 2
+            self._n_exiting_modules = 2 if "ik" in cmd_name else 2 # Changed for HEAD LOOK IK
 
         if cmd_name != "pole_direction":
             self._kill_pole_direction()
 
         # Hold position
         if cmd_name in ["head_look_exit", "home", "pole_direction"]:
-
             if cmd_name == "pole_direction" and not self.pole_climb_initialized:
+                self.direction = self._snake_command.param_value[2]
+                head_acc = self._get_head_acc()
+                self.head_acc_x_before_rolling = head_acc[0]
+                self.head_acc_y_before_rolling = head_acc[1]
                 self._create_arc(self._snake_command.param_value[2], self._arc_beta, self._imu_dir)
 
             if cmd_name == "head_look_exit":
                 if hasattr(self, "_started_head_look"):
                     self._exiting_head_look = True
+                    self.ik_headlook_started = False
 
             # Set hold (fixed) position depending on the command
             if cmd_name == "home":
@@ -292,12 +320,37 @@ class CommandManager(Node):
                     self._current_joint_state,
                     self._elapsed_snake_time
                 )
-            if cmd_name == "head_look":
+
+            if cmd_name == "head_look" or cmd_name == "head_look_ik": # Changed for HEAD LOOK IK
                 # Pass head accelerations as a gait param.
                 self._snake_command.param_name = list(self._snake_command.param_name)
                 self._snake_command.param_value = list(self._snake_command.param_value)
-                self._snake_command.param_name.append("head_acc")
-                self._snake_command.param_value.append(self._head_acc)
+                self._snake_command.param_name.append("head_acc_x")
+                self._snake_command.param_value.append(self._head_acc[0])
+                self._snake_command.param_name.append("head_acc_y")
+                self._snake_command.param_value.append(self._head_acc[1])
+                self._snake_command.param_name.append("head_x")
+                self._snake_command.param_value.append(self.head_state[0])
+                self._snake_command.param_name.append("head_y")
+                self._snake_command.param_value.append(self.head_state[1])
+                self._snake_command.param_name.append("head_z")
+                self._snake_command.param_value.append(self.head_state[2])
+                self._snake_command.param_name.append("head_roll")
+                self._snake_command.param_value.append(self.head_state[3])
+                self._snake_command.param_name.append("head_pitch")
+                self._snake_command.param_value.append(self.head_state[4])
+                self._snake_command.param_name.append("head_yaw")
+                self._snake_command.param_value.append(self.head_state[5])
+            
+            # elif cmd_name=="rolling":
+            #     self._snake_command.param_name = list(self._snake_command.param_name)
+            #     self._snake_command.param_value = list(self._snake_command.param_value)
+            #     self._snake_command.param_name.append("head_acc_x")
+            #     self._snake_command.param_value.append(self.head_acc_x_before_rolling)
+            #     self._snake_command.param_name.append("head_acc_y")
+            #     self._snake_command.param_value.append(self.head_acc_y_before_rolling)
+            #     self._snake_command.param_name.append("direction")
+            #     self._snake_command.param_value.append(self.direction)
 
             self._controller.update_gait(self._snake_command, self._prev_cmd, transition_override=transition_override)
 
@@ -315,16 +368,9 @@ class CommandManager(Node):
                 )
             else:
                 self._desired_joint_state = self._controller.update(self._current_joint_state)
-
-                # Debug
-                # self.get_logger().info("Current : "+ str(self._current_joint_state.position[1]))
-                # self.get_logger().info("Desired : "+ str(self._desired_joint_state.position[1]))
-
         else:
             self._controller._last_time = self._current_joint_state.header.stamp
 
-        # Debug
-        # self.get_logger().info(str(self._desired_joint_state.position[1]))
         return self._desired_joint_state
     
     def timer_callback(self):

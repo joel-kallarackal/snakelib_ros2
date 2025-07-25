@@ -5,9 +5,8 @@ import math
 
 import numpy as np
 from sensor_msgs.msg import Image
-from tf.transformations import euler_from_quaternion
+from tf_transformations import euler_from_quaternion
 from builtin_interfaces.msg import Time
-
 
 def module_to_head(data):
     r"""Returns the roll of the module preceeding the head module (we use this since head does not have an IMU.

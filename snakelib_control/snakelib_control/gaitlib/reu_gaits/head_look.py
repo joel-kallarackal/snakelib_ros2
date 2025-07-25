@@ -27,7 +27,7 @@ def head_look(self, t: float = 0, current_angles: np.ndarray = None, params: Dic
     x_state, y_state = params["x_state"], params["y_state"]
 
     # Use accelerations to correct direction of rotation.
-    head_acc = params["head_acc"]
+    head_acc = [params["head_acc_x"], params["head_acc_y"]]
     before_head_vel = y_state if abs(head_acc[1]) > abs(head_acc[0]) else x_state
     major_comp_sign = np.sign(head_acc[np.argmax(np.abs(head_acc))])
     before_head_vel *= major_comp_sign

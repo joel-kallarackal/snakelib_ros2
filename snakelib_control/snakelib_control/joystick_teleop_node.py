@@ -203,12 +203,12 @@ class JoystickTeleop(Node):
                     (
                         self._x_state,
                         self._y_state,
+                        self._yaw,
+                        self._pitch,
                         self._z_state,
                         self._roll,
-                        self._pitch,
-                        self._yaw,
                     ) = self.joy_state[:6]
-
+                    
                 # Reset sidewind slope value if the selected gait is not conical_sidewinding
                 if self.command != "conical_sidewinding":
                     self._slope_sidewind = self._slope_default
@@ -294,9 +294,9 @@ class JoystickTeleop(Node):
         # Add x, y, z, pitch & yaw states only when inverse kinematics based head look gait is selected
         if self.command == "head_look_ik":
             self._snake_command.param_name.extend(["x_state", "y_state", "z_state"])
+            self._snake_command.param_value.extend([self._x_state, self._y_state, self._z_state])
             self._snake_command.param_name.extend(["roll", "pitch", "yaw"])
             self._snake_command.param_value.extend([self._roll, self._pitch, self._yaw])
-            self._snake_command.param_value.extend([self._x_state, self._y_state, self._z_state])
 
         # Add slope parameter only when conical_sidewinding gait is selected
         if self.command == "conical_sidewinding":

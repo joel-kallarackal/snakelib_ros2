@@ -108,7 +108,7 @@ mode__slow_gaits:
     1: mode__scan
   r_stick:
     0: mode__head_look
-    1: mode__head_look
+    1: mode__head_look_ik
   l_stick:
     0: light_toggle
     1: light_toggle
@@ -135,7 +135,7 @@ mode__pole_climb:
   r_stick_y:
     0: ''
   l_stick_x:
-    0: ''
+    0: 'g__rolling__'
   l_stick_y:
     0: ''
 
@@ -162,7 +162,7 @@ mode__pole_climb:
     1: mode__scan
   r_stick:
     0: mode__head_look
-    1: mode__head_look
+    1: mode__head_look_ik
   l_stick:
     0: light_toggle
     1: light_toggle
@@ -214,7 +214,7 @@ mode__scan:
     1: mode__scan
   r_stick:
     0: mode__head_look
-    1: mode__head_look
+    1: mode__head_look_ik
   l_stick:
     0: light_toggle
     1: light_toggle
