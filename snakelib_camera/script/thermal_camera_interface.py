@@ -1,13 +1,16 @@
 import rclpy
 
-from scripts.camera_interface import CameraStreamerBase
+from script.camera_interface import CameraStreamerBase
 from sensor_msgs.msg import Image
-from rclpy.parameter import Parameter
-from scripts.streaming_utils import toggle_cam_stream
+from script.streaming_utils import toggle_cam_stream
 import time
 import numpy as np
 import socket
 import struct
+
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class ThermalCameraStreamer(CameraStreamerBase):
     """Driver node that publishes the camera data from the snake head."""
@@ -19,29 +22,24 @@ class ThermalCameraStreamer(CameraStreamerBase):
         # Initialize running attributes.
         self.thermal_img = self._thermal_img = None
 
+        params_path1 = os.path.join(get_package_share_directory('snakelib_camera'), 'param', 'camera_params.yaml')
+        
+        with open(params_path1, "r") as file:
+            self.data = yaml.safe_load(file)
+
         # Initialize camera parameters.
-        self.declare_parameter("port", Parameter.Type.INTEGER)
-        self.declare_parameter("ip", Parameter.Type.STRING)
-        self.port = self.get_parameter("port")
-        self.ip = self.get_paramter("ip")
+        self.port = self.data.get("port")
+        self.ip = self.data.get("ip")
 
-        self.declare_parameter("min_temp", Parameter.Type.INTEGER)
-        self.declare_parameter("imax_temp", Parameter.Type.INTEGER)
-        self.min_temp = self.get_parameter("min_temp")
-        self.max_temp = self.get_parameter("max_temp")
-
-        self.declare_parameter("thermal_img_rows", Parameter.Type.INTEGER)
-        self.declare_parameter("thermal_img_cols", Parameter.Type.INTEGER)
-        self.declare_parameter("thermal_byte_size", Parameter.Type.INTEGER)
-        self.img_rows = self.get_parameter("thermal_img_rows")
-        self.img_cols = self.get_parameter("thermal_img_cols")
-        self.byte_size = self.get_parameter("thermal_byte_size")
+        self.min_temp = self.data.get("min_temp")
+        self.max_temp = self.data.get("max_temp")
+        self.img_rows = self.data.get("thermal_img_rows")
+        self.img_cols = self.data.get("thermal_img_cols")
+        self.byte_size = self.data.get("thermal_byte_size")
         self.img_size = (self.img_rows * self.img_cols) * self.byte_size
 
         self.thermal_cam_pub = self.create_publisher(Image, '/thermal_cam/image_raw', 1)
-
-        self.declare_parameter("thermal_camera_frequency", Parameter.Type.DOUBLE)
-        self.loop_rate = self.get_parameter("thermal_camera_frequency")  # FPS
+        self.loop_rate = self.data.get("thermal_camera_frequency")  # FPS
 
         self.cam_names = ["thermal"]
 
@@ -100,8 +98,7 @@ class ThermalCameraStreamer(CameraStreamerBase):
     @property
     def thermal(self):
         r"""Checks for the latest set status of thermal streaming and toggles stream if required."""
-        self.declare_parameter("stream_thermal", Parameter.Type.BOOL)
-        status = self.get_parameter("stream_thermal", False)
+        status = self.data.get("stream_thermal", False)
         if not hasattr(self, "_thermal_status"):
             setattr(self, "_thermal_status", not status)
         if status and not getattr(self, "_thermal_status"):

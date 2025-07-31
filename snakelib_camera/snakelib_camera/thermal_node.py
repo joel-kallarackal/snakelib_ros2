@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.executors import ExternalShutdownException
-from scripts.thermal_camera_interface import ThermalCameraStreamer
+from script.thermal_camera_interface import ThermalCameraStreamer
 
 def main():
     rclpy.init()

@@ -5,7 +5,7 @@ from rclpy.node import Node
 
 
 from snakelib_srvs.srv import ToggleStream, ToggleStreamResponse
-from scripts.streaming_utils import execute_script
+from script.streaming_utils import execute_script
 
 PASSWORD = "fa"
 RPI_IP = "192.168.8.132"

@@ -50,7 +50,6 @@ def toggle_cam_stream(stream_name, on, max_attempts=2):
     Returns:
         bool: True if successful, False otherwise
     """
-    rclpy.init()
     node = rclpy.create_node('toggle_cam_stream_client_node')
 
     client = node.create_client(ToggleStream, 'toggle_stream')

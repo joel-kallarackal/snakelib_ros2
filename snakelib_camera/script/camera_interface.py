@@ -3,11 +3,15 @@ import sys
 import time
 import numpy as np
 import rclpy
-from scripts.camera_utils import to_img_msg
-from scripts.streaming_utils import toggle_cam_stream, toggle_led_stream
-from scripts.video_capture import VideoCapture
+from script.camera_utils import to_img_msg
+from script.streaming_utils import toggle_cam_stream, toggle_led_stream
+from script.video_capture import VideoCapture
 from rclpy.parameter import Parameter
 import cv2
+
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class CameraStreamerBase(HEBIROSWrapper):
     """Base class for defining shared methods across different cameras."""
@@ -22,7 +26,11 @@ class CameraStreamerBase(HEBIROSWrapper):
 
         self.to_numpy_img = lambda x: np.frombuffer(x.data, dtype=np.uint8).reshape(x.height, x.width, -1)
 
-        self.declare_parameter("led",Parameter.Type.BOOL)
+        params_path1 = os.path.join(get_package_share_directory('snakelib_camera'), 'param', 'camera_params.yaml')
+        
+        with open(params_path1, "r") as file:
+            self.data = yaml.safe_load(file)
+
 
         # Set the camera names
         self.cam_names = []
@@ -122,11 +130,7 @@ class CameraStreamerBase(HEBIROSWrapper):
             cam_name (str): Name of the camera stream to publish.
             address (str): Http address of the camera stream.
         """
-
-        # Use below declaration only if parameters not launched via a launch file
-        # self.declare_parameter(f"stream_{cam_name}",False)
-        self.declare_parameter(f"stream_{cam_name}",Parameter.Type.BOOL)
-        status = self.get_parameter(f"stream_{cam_name}")
+        status = self.data.get(f"stream_{cam_name}")
         if not hasattr(self, f"_{cam_name}_status"):
             setattr(self, f"_{cam_name}_status", not status)
         if status and not getattr(self, f"_{cam_name}_status"):
@@ -157,7 +161,7 @@ class CameraStreamerBase(HEBIROSWrapper):
     @property
     def led(self):
         r"""Checks the latest user-set status of the LED stream and toggles the LED stream if required."""
-        status = self.get_parameter("led")
+        status = self.data.get("led")
         if not hasattr(self, "_led_status"):
             setattr(self, "_led_status", not status)
         if status and not self._led_status:

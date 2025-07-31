@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.executors import ExternalShutdownException
-from scripts.image_processing import ImageProcessor
+from script.image_processing import ImageProcessor
 
 def main():
     rclpy.init()

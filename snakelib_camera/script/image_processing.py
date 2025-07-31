@@ -1,16 +1,20 @@
 import rclpy
 
 from snakelib_msgs.msg import HebiSensors
-from scripts.camera_interface import CameraStreamerBase
+from script.camera_interface import CameraStreamerBase
 from sensor_msgs.msg import Image
 from rclpy.parameter import Parameter
-from scripts.camera_utils import to_img_msg, module_to_head
+from script.camera_utils import to_img_msg, module_to_head
 import time
 from collections import deque
 from functools import partial
 import numpy as np
 import cv2
 from imutils import rotate as _rotate_img
+
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 
 class ImageProcessor(CameraStreamerBase):
@@ -22,17 +26,18 @@ class ImageProcessor(CameraStreamerBase):
         self._VALID_CAM_NAMES.extend(["processed_pinhole", "processed_fisheye", "processed_thermal"])
         self._VALID_CAM_STREAMS.extend(["processed_pinhole", "processed_fisheye", "processed_thermal", "processed_overlay"])
 
+        params_path1 = os.path.join(get_package_share_directory('snakelib_camera'), 'param', 'camera_params.yaml')
+        
+        with open(params_path1, "r") as file:
+            self.data = yaml.safe_load(file)
         # Initialize running attributes.
         self._head_roll = 0.0
-        self.declare_parameter("head_roll_history_len", Parameter.Type.INTEGER)
-        self._head_roll_history = deque([], self.get_parameter("head_roll_history_len", 10))
+        self._head_roll_history = deque([], self.data.get("head_roll_history_len", 10))
         self._pinhole_img = self._thermal_img = self._fisheye_img = None  # Raw images buffer
         self._processed_pinhole_img = self._processed_thermal_img = self._processed_fisheye_img = None  # Raw images buffer
 
-        self.declare_parameter("smooth_rotate_image", Parameter.Type.BOOL)
-        self._smooth_rotate = self.get_parameter("smooth_rotate_image", False) and self.rotate
-        self.declare_parameter("max_delta", Parameter.Type.INTEGER)
-        self.max_delta = self.get_parameter("max_delta", 20)
+        self._smooth_rotate = self.data.get("smooth_rotate_image", False) and self.rotate
+        self.max_delta = self.data.get("max_delta", 20)
 
         self.raw_cam_names = ["fisheye", "pinhole", "thermal"]
         self.cam_names = [f"processed_{cam_name}" for cam_name in self.raw_cam_names]
@@ -61,8 +66,7 @@ class ImageProcessor(CameraStreamerBase):
         self.processed_overlay_cam_pub = self.create_publisher(Image, "processed_overlay_cam/image_raw", 1)
 
         # Set loop rate as camera FPS.
-        self.declare_parameter("image_processing_frequency", Parameter.Type.DOUBLE)
-        self.loop_rate = self.get_parameter("image_processing_frequency")  # FPS
+        self.loop_rate = self.data.get("image_processing_frequency")  # FPS
 
     def update_feedback(self):
         r"""Populates respective attributes with updated sensor readings."""
@@ -70,9 +74,7 @@ class ImageProcessor(CameraStreamerBase):
         raw_feedback = self.get_feedback()
 
         
-        # self.declare_parameter('overlay_background', 'pinhole') # Use if parameter not launched along with launch file
-        self.declare_parameter('overlay_background', Parameter.Type.STRING)
-        background_img_type = f"{self.get_parameter('overlay_background')}_img"
+        background_img_type = f"{self.data.get('overlay_background')}_img"
         if self.processed_overlay:
             raw_feedback.update({"overlay_img": self.get_overlay_img(raw_feedback)})
         else:
@@ -107,14 +109,9 @@ class ImageProcessor(CameraStreamerBase):
             overlayed_img (np.ndarray): overlayed image.
         """
 
-        # self.declare_parameter('foreground_alpha', 0.8) # Use if parameter not launched along with launch file
-        self.declare_parameter('foreground_alpha', Parameter.Type.DOUBLE)
-        alpha = self.get_parameter("foreground_alpha")
-        foreground_img_type = "thermal"  # rospy.get_param('overlay_foreground', False)
-
-        # self.declare_parameter('foreground_alpha', False) # Use if parameter not launched along with launch file
-        self.declare_parameter('overlay_background', Parameter.Type.BOOL)
-        background_img_type = self.get_parameter("overlay_background", False)
+        alpha = self.data.get("foreground_alpha")
+        foreground_img_type = "thermal"
+        background_img_type = self.data.get("overlay_background", False)
 
         foreground_img = feedback.get(f"{foreground_img_type}_img", None)
         background_img = feedback.get(f"{background_img_type}_img", None)
@@ -215,31 +212,26 @@ class ImageProcessor(CameraStreamerBase):
     @property
     def processed_overlay(self):
         r"""Flag to decide if overlay streaming is required"""
-        self.declare_parameter('stream_overlay', Parameter.Type.BOOL)
-        return self.get_parameter("stream_overlay", False)
+        return self.data.get("stream_overlay", False)
 
     @property
     def rotate(self):
         r"""Flag to decide if camera rotation is required"""
-        self.declare_parameter('rotate_image', Parameter.Type.BOOL)
-        return self.get_parameter("rotate_image", False)
+        return self.data.get("rotate_image", False)
 
     @property
     def processed_fisheye(self):
         r"""Flag to decide if processing is required for fisheye image"""
-        self.declare_parameter('process_fisheye', Parameter.Type.BOOL)
-        return self.get_parameter("process_fisheye", False)
+        return self.data.get("process_fisheye", False)
 
     @property
     def processed_pinhole(self):
         r"""Flag to decide if processing is required for pinhole image"""
-        self.declare_parameter('process_pinhole', Parameter.Type.BOOL)
-        return self.get_parameter("process_pinhole", False)
+        return self.data.get("process_pinhole", False)
 
     @property
     def processed_thermal(self):
         r"""Flag to decide if processing is required for thermal image"""
-        self.declare_parameter('process_thermal', Parameter.Type.BOOL)
-        return self.get_parameter("process_thermal", False)
+        return self.data.get("process_thermal", False)
 
     

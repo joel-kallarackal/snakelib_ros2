@@ -1,10 +1,13 @@
 import rclpy
 
-from scripts.camera_interface import CameraStreamerBase
+from script.camera_interface import CameraStreamerBase
 from sensor_msgs.msg import Image
-from rclpy.parameter import Parameter
-from scripts.camera_utils import to_img_msg
+from script.camera_utils import to_img_msg
 import time
+
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class PinholeCameraStreamer(CameraStreamerBase):
     """Driver node that publishes the camera data from the snake head."""
@@ -12,6 +15,11 @@ class PinholeCameraStreamer(CameraStreamerBase):
     def __init__(self):
         # Establish communication with the HEBI modules.
         super().__init__('pinhole_node')
+
+        params_path1 = os.path.join(get_package_share_directory('snakelib_camera'), 'param', 'camera_params.yaml')
+        
+        with open(params_path1, "r") as file:
+            self.data = yaml.safe_load(file)
         
         # Initialize running attributes.
         self._pinhole_img = None  # Raw images buffer
@@ -21,11 +29,9 @@ class PinholeCameraStreamer(CameraStreamerBase):
 
 
         # Set loop rate as camera FPS.
-        self.declare_parameter("camera_frequency", Parameter.Type.DOUBLE)
-        self.loop_rate = self.get_parameter("camera_frequency")  # FPS\
+        self.loop_rate = self.data.get("camera_frequency")  # FPS
 
-        self.declare_parameter("pinhole_cam_address", Parameter.Type.STRING)
-        self.cam_address = self.get_parameter("pinhole_cam_address")
+        self.cam_address = self.data.get("pinhole_cam_address")
 
         self.get_logger().info(f"Pinhole cam status: {self.pinhole}")
 
@@ -76,11 +82,9 @@ class FisheyeCameraStreamer(CameraStreamerBase):
         self.fisheye_cam_pub = self.create_publisher(Image, '/fisheye_cam/image_raw', 1)
 
         # Set loop rate as camera FPS.
-        self.declare_parameter("camera_frequency", Parameter.Type.DOUBLE)
-        self.loop_rate = self.get_parameter("camera_frequency", 30.0)  # FPS\
+        self.loop_rate = self.data.get("camera_frequency", 30.0)  # FPS\
 
-        self.declare_parameter("camera_frequency", Parameter.Type.STRING)
-        self.cam_address = self.get_parameter("fisheye_cam_address")
+        self.cam_address = self.data.get("fisheye_cam_address")
 
         self.get_logger().info(f"Fisheye cam status: {self.fisheye}")
 

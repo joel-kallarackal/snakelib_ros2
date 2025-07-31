@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.executors import ExternalShutdownException
-from scripts.usb_camera_interface import PinholeCameraStreamer
+from script.usb_camera_interface import PinholeCameraStreamer
 
 def main():
     rclpy.init()

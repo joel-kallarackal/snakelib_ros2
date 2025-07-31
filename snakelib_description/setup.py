@@ -40,6 +40,12 @@ for root, dirs, files in os.walk('RSNAKE_snake'):
         dest_dir = os.path.join('share', package_name, root)
         data_files.append((dest_dir, files))
 
+for root, dirs, files in os.walk('dummy_snake'):
+    files = [os.path.join(root, f) for f in files]
+    if files:
+        dest_dir = os.path.join('share', package_name, root)
+        data_files.append((dest_dir, files))
+
 
 setup(
     name=package_name,
