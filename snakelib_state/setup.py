@@ -23,6 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'virtual_chassis = snakelib_state.virtual_chassis:main',
             'state_estimation = snakelib_state.state_estimation:main',
         ],
     },

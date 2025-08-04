@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 
 import yaml
 import os
@@ -12,11 +13,9 @@ from matplotlib.animation import FuncAnimation
 
 import copy
 
-import threading
-
 class StateEstimator(Node):
     def __init__(self):
-        super().__init__('state_estimator')
+        super().__init__('state_estimator_node')
         self.joint_state_sub = self.create_subscription(
             JointState,
             '/snake/joint_states',
@@ -24,35 +23,63 @@ class StateEstimator(Node):
             10 
         )
         self.joint_state_sub
+
+        self.jam_feedback_sub = self.create_subscription(
+            String,
+            '/snake/jam_feedback',
+            self.joint_state_cb,
+            10 
+        )
+        self.jam_feedback_sub
     
         params_path1 = os.path.join(get_package_share_directory('snakelib_state'), 'param', 'estimation_params.yaml')
         
         with open(params_path1, "r") as file:
             self.data = yaml.safe_load(file)
 
-        visualization_enabled = self.data.get("visualization")
         self.dh = self.data.get("dh")
         self.l = self.data.get("l")
 
         self.current_joint_angles = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        if visualization_enabled:
-            self.initialised = False
-            ###
-            # fig = plt.figure()
-            # self.ax = fig.add_subplot(111, projection='3d')
-            # ani = FuncAnimation(fig, self.update_plot, interval=100)
-            # plt.tight_layout()
-            # # plt.show()
-            # threading.Thread(target=plt.show, daemon=True).start()
-            ###
-            plt.ion()  # Interactive mode on
-            self.fig = plt.figure()
-            self.ax = self.fig.add_subplot(111, projection='3d')
-            self.timer = self.create_timer(0.1, self.update_plot)
+        self.jam_initialised = False
+
+        self.module_mapping = {"head": 0, "tail": 15, "tail_tip": 16}
+
+        self.head_tip_in_head_frame = [-self.l, 0, 0, 1]
 
     def joint_state_cb(self, msg):
-        # self.get_logger().info("updating joint angles....")
         self.current_joint_angles = list(msg.position)
+
+        if self.jam_initialised:
+            jam_module = self.module_mapping[self.jam_type]
+            T_frames_in_head = self.compute_fk(self.dh, self.current_joint_angles)
+            T_body_in_world = self.body_frame_in_world
+            T_body_in_head = T_frames_in_head[self.module_mapping[self.jam_type]]
+            T_frames_in_body = self.convert_frames(T_frames_in_head, T_body_in_head)
+            T_frames_in_world = [T_body_in_world @ T_frames_in_body[i] for i in range(len(T_frames_in_body))]
+ 
+            if self.jam_type=="tail":
+                self.unjammed_tip_location_in_world =  (T_body_in_world @ (np.linalg.inv(T_body_in_head) @ T_frames_in_head[0])) @ self.head_tip_in_head_frame
+            elif self.jam_type=="head":
+                self.unjammed_tip_location_in_world = T_frames_in_world[self.module_mapping["tail_tip"]][:3, 3]
+            else:
+                self.get_logger().error(f"{self.jam_type} is an unrecognized jam type.")
+
+            x, y, z = self.unjammed_tip_location_in_world
+            self.get_logger.info(f"World Frame >> X : {str(x)}, Y : {str(y)}, Z : {str(z)}")
+
+    def jam_feedback_cb(self, msg):
+        # change body frame on signal
+        self.jam_type = msg.data
+
+        # Set world frame on first successful jam
+        if self.jam_initialised==False:
+            self.T_vc_in_head = self.get_virtual_chassis(self.dh, self.current_joint_angles, False)
+            self.jam_initialised==True
+        
+        T_frames_in_head = self.compute_fk(self.dh, self.current_joint_angles)
+        self.body_frame_in_world = np.linalg.inv(self.T_vc_in_head) @ T_frames_in_head[self.module_mapping[self.jam_type]] 
+        
 
     def compute_com(self, T_list, l):
         coms = []
@@ -88,14 +115,13 @@ class StateEstimator(Node):
 
         return Ts
     
-    def update_plot(self):
-        self.ax.clear()
-        T_list = self.compute_fk(self.dh, self.current_joint_angles) # Step 1
-        coms, overall_com = self.compute_com(T_list, self.l) # Step 2
+    def get_virtual_chassis(self, dh, joint_angles, initialised=False, T_vc_before=None):
+        T_list = self.compute_fk(dh, joint_angles)
+        coms, overall_com = self.compute_com(T_list, self.l) 
 
         # Data Matrix
-        P = np.array(coms) - overall_com # Step 3
-        U, S, VT = np.linalg.svd(P) # Step 4
+        P = np.array(coms) - overall_com
+        U, S, VT = np.linalg.svd(P)
         V = VT.T
 
         # Virtual Chassis with respect to the initial body frame
@@ -106,10 +132,12 @@ class StateEstimator(Node):
         # Enforce no sign flips
         v1 = T_vc[:3, 0]
         v2 = T_vc[:3, 1]
-        if self.initialised==False:
+        if initialised==False:
             self.v1_before = copy.copy(v1)
             self.v2_before = copy.copy(v2)
-            self.initialised = True
+        else:
+            self.v1_before = T_vc_before[:3, 0]
+            self.v2_before = T_vc_before[:3, 1]
 
         if np.dot(v1, self.v1_before) < 0:
             v1 = -v1
@@ -127,65 +155,22 @@ class StateEstimator(Node):
         # Make the virtual chassis always right handed
         T_vc[:3, 2] = np.cross(T_vc[:3, 0], T_vc[:3, 1])
 
-        # Frames with respect to virtual chassis
-        T_new = []
-        T_vc_inv = np.linalg.inv(T_vc)
-        for t in T_list:
-            T_new.append(T_vc_inv @ t)
+        return T_vc
+    
+    def convert_frames(self, T_list, frame_number=-1, T_target=None):
+        T_list_new = []
+
+        if frame_number != -1:
+            T_target = T_list[frame_number]
+            T_target_inv = np.linalg.inv(T_target)
+
+            for i in range(len(T_list)):
+                T_list_new.append(T_target_inv @ T_list[i])
+        else: 
+            T_target_inv = np.linalg.inv(T_target)
+
+            for i in range(len(T_list)):
+                T_list_new.append(T_target_inv @ T_list[i])
         
-        
-        coms_vc, overall_com_vc = self.compute_com(T_new, self.l) # Step 2
-        
-        self.ax.scatter(coms_vc[:, 0], coms_vc[:, 1], coms_vc[:, 2], c='m', label='Link COMs')
-        self.ax.scatter(*overall_com_vc, c='cyan', s=100, label='Virtual Chassis')
-        self.ax.text(*overall_com_vc, '', color='cyan', fontsize=10)
-        plt.legend()
 
-        T_vc_in_vc = T_vc_inv @ T_vc # Virtual chassis frame in virtual chassis frame
-
-        self.ax.quiver(*T_vc_in_vc[:3, 3], *T_vc_in_vc[:3, 0], color='r')  # X axis
-        self.ax.quiver(*T_vc_in_vc[:3, 3], *T_vc_in_vc[:3, 1], color='g')  # Y axis
-        self.ax.quiver(*T_vc_in_vc[:3, 3], *T_vc_in_vc[:3, 2], color='b')  # Z axis
-        # ax.text(*T_vc_in_vc[:3, 3], '', fontsize=10)
-
-
-        origins_vc = np.array([T[:3, 3] for T in T_new])
-        head_vc = (T_vc_inv @ T_list[0]) @ [-self.l, 0, 0, 1] # Convert head tip to VC frame
-        origins_vc = np.concatenate(([head_vc[:3]], origins_vc))
-
-        self.ax.text(*head_vc[:3], 'Head', fontsize=10)
-
-        # Plot links
-        self.ax.plot(origins_vc[:, 0], origins_vc[:, 1], origins_vc[:, 2], 'k-o', linewidth=2)
-
-        # Plot frames
-        for i, T in enumerate(T_new):
-            origin = T[:3, 3]
-            self.ax.quiver(*origin, *T[:3, 0]*0.1, color='r')  # X axis
-            self.ax.quiver(*origin, *T[:3, 1]*0.1, color='g')  # Y axis
-            self.ax.quiver(*origin, *T[:3, 2]*0.1, color='b')  # Z axis
-            if i!=16:
-                self.ax.text(*origin, f'J{i}', fontsize=10)
-            else:
-                self.ax.text(*origin, 'Tail', fontsize=10)
-
-        self.ax.set_xlim([-10, 10])
-        self.ax.set_ylim([-10, 10])
-        self.ax.set_zlim([-2, 2])
-        self.ax.set_xlabel('X')
-        self.ax.set_ylabel('Y')
-        self.ax.set_zlabel('Z')
-        self.ax.set_title('Snake Shape With Respect To Virtual Chassis')
-
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = StateEstimator()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
+        return T_list_new
