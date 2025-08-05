@@ -84,6 +84,11 @@ class HEBISensingROSWrapper(HEBIROSWrapper):
         self.hebi_sensors.orientation.z = list(map(float, feedback["orientation"][:, 2]))
         self.hebi_sensors.orientation.w = list(map(float, feedback["orientation"][:, 3]))
 
+        self.hebi_sensors.motor_current = list(map(float, feedback["motor_current"]))
+        self.hebi_sensors.motor_winding_current = list(map(float, feedback["motor_winding_current"]))
+        self.hebi_sensors.bus_voltage = list(map(float, feedback["bus_voltage"]))
+        self.hebi_sensors.motor_winding_voltage = list(map(float, feedback["motor_winding_voltage"]))
+
         self.joint_state.header = self.hebi_sensors.header
         self.joint_state.name = self.module_names
         self.joint_state.position = self.hebi_sensors.position
@@ -118,6 +123,10 @@ class HEBISensingROSWrapper(HEBIROSWrapper):
             "lin_acc": self.robot_feedback.accelerometer,
             "ang_vel": self.robot_feedback.gyro,
             "orientation": self.robot_feedback.orientation,
+            "motor_current":self.robot_feedback.motor_current,
+            "motor_winding_current":self.robot_feedback.motor_winding_current,
+            "bus_voltage":self.robot_feedback.voltage,
+            "motor_winding_voltage":self.robot_feedback.motor_winding_voltage,
         }
 
         return feedback

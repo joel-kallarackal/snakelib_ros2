@@ -27,3 +27,8 @@ float64[] effort
 Vec3List lin_acc
 Vec3List ang_vel
 QuatList orientation
+float64[] motor_current
+float64[] motor_winding_current
+float64[] bus_voltage
+float64[] motor_winding_voltage
+
