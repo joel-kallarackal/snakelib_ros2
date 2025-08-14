@@ -248,9 +248,9 @@ mode__head_look:
   r_bumper:
     0: ''
   l_trigger:
-    0: ''
+    0: offset__plus
   r_trigger:
-    0: ''
+    0: offset__minus
   X:
     0: ''
   Y:

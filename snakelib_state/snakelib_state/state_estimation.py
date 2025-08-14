@@ -13,6 +13,12 @@ from matplotlib.animation import FuncAnimation
 
 import copy
 
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point, Quaternion
+from tf_transformations import quaternion_from_matrix
+
+
+
 class StateEstimator(Node):
     def __init__(self):
         super().__init__('state_estimator_node')
@@ -27,10 +33,12 @@ class StateEstimator(Node):
         self.jam_feedback_sub = self.create_subscription(
             String,
             '/snake/jam_feedback',
-            self.joint_state_cb,
+            self.jam_feedback_cb,
             10 
         )
         self.jam_feedback_sub
+
+        self.frame_pub = self.create_publisher(Marker, 'visualization_marker', 10)
     
         params_path1 = os.path.join(get_package_share_directory('snakelib_state'), 'param', 'estimation_params.yaml')
         
@@ -43,12 +51,12 @@ class StateEstimator(Node):
         self.current_joint_angles = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.jam_initialised = False
 
-        self.module_mapping = {"head": 0, "tail": 15, "tail_tip": 16}
+        self.module_mapping = {"head": 16, "tail": 1, "tail_tip": 0}
 
         self.head_tip_in_head_frame = [-self.l, 0, 0, 1]
 
     def joint_state_cb(self, msg):
-        self.current_joint_angles = list(msg.position)
+        self.current_joint_angles = list(msg.position)[::-1]
 
         if self.jam_initialised:
             jam_module = self.module_mapping[self.jam_type]
@@ -56,30 +64,81 @@ class StateEstimator(Node):
             T_body_in_world = self.body_frame_in_world
             T_body_in_head = T_frames_in_head[self.module_mapping[self.jam_type]]
             T_frames_in_body = self.convert_frames(T_frames_in_head, T_body_in_head)
-            T_frames_in_world = [T_body_in_world @ T_frames_in_body[i] for i in range(len(T_frames_in_body))]
+            self.T_frames_in_world = [T_body_in_world @ T_frames_in_body[i] for i in range(len(T_frames_in_body))]
  
             if self.jam_type=="tail":
-                self.unjammed_tip_location_in_world =  (T_body_in_world @ (np.linalg.inv(T_body_in_head) @ T_frames_in_head[0])) @ self.head_tip_in_head_frame
+                # self.unjammed_tip_location_in_world =  ((T_body_in_world @ (np.linalg.inv(T_body_in_head) @ T_frames_in_head[16])) @ self.head_tip_in_head_frame)[:3]
+                # self.unjammed_tip_location_in_world =  ((T_body_in_world @ (np.linalg.inv(T_body_in_head) @ T_frames_in_head[16])))[:3, 3]
+                self.unjammed_tip_location_in_world = self.T_frames_in_world[self.module_mapping["head"]][:3, 3]
             elif self.jam_type=="head":
-                self.unjammed_tip_location_in_world = T_frames_in_world[self.module_mapping["tail_tip"]][:3, 3]
+                self.unjammed_tip_location_in_world = self.T_frames_in_world[self.module_mapping["tail_tip"]][:3, 3]
             else:
                 self.get_logger().error(f"{self.jam_type} is an unrecognized jam type.")
 
             x, y, z = self.unjammed_tip_location_in_world
-            self.get_logger.info(f"World Frame >> X : {str(x)}, Y : {str(y)}, Z : {str(z)}")
+            self.get_logger().info(f"World Frame >> X : {str(x)}, Y : {str(y)}, Z : {str(z)}")
+            self.get_logger().info(f"Distance : {np.sqrt(x**2+y**2+z**2)}")
+
+            matrices = [frame for frame in self.T_frames_in_world]
+            matrices.append(np.eye(4))
+            matrices.append(T_body_in_world)
+            for i, mat in enumerate(matrices):
+                marker = Marker()
+                marker.header.frame_id = "world"
+                marker.header.stamp = self.get_clock().now().to_msg()
+                marker.ns = "frames"
+                marker.id = i
+                marker.type = Marker.ARROW  # AXES not available in some versions
+                marker.action = Marker.ADD
+
+                marker.pose.position.x = mat[0, 3]
+                marker.pose.position.y = mat[1, 3]
+                marker.pose.position.z = mat[2, 3]
+                quat = quaternion_from_matrix(mat)
+                marker.pose.orientation = Quaternion(x=quat[0], y=quat[1], z=quat[2], w=quat[3])
+
+                marker.scale.x = 0.05  # shaft length
+                marker.scale.y = 0.02  # shaft diameter
+                marker.scale.z = 0.02  # head diameter
+
+                marker.color.a = 1.0
+                marker.color.r = 1.0
+                marker.color.g = 0.0
+                marker.color.b = 0.0
+
+                if i==(len(matrices)-2):
+                    # World Frame
+                    marker.color.a = 1.0
+                    marker.color.r = 0.0
+                    marker.color.g = 1.0
+                    marker.color.b = 0.0
+
+                if i==(len(matrices)-1):
+                    # Body Frame
+                    marker.color.a = 1.0
+                    marker.color.r = 0.0
+                    marker.color.g = 0.0
+                    marker.color.b = 1.0
+
+                self.frame_pub.publish(marker)
+
 
     def jam_feedback_cb(self, msg):
         # change body frame on signal
         self.jam_type = msg.data
+        self.get_logger().info(f"Jam Signal Received : {self.jam_type}")
 
         # Set world frame on first successful jam
         if self.jam_initialised==False:
             self.T_vc_in_head = self.get_virtual_chassis(self.dh, self.current_joint_angles, False)
-            self.jam_initialised==True
-        
-        T_frames_in_head = self.compute_fk(self.dh, self.current_joint_angles)
-        self.body_frame_in_world = np.linalg.inv(self.T_vc_in_head) @ T_frames_in_head[self.module_mapping[self.jam_type]] 
-        
+            self.T_vc_in_head[:3,3] = [0, 0 ,0]
+            self.jam_initialised=True
+            self.get_logger().info("State Estimation Initialised")
+            T_frames_in_head = self.compute_fk(self.dh, self.current_joint_angles)
+            self.body_frame_in_world = np.linalg.inv(self.T_vc_in_head) @ T_frames_in_head[self.module_mapping[self.jam_type]] 
+        else:
+            T_frames_in_head = self.compute_fk(self.dh, self.current_joint_angles)
+            self.body_frame_in_world = self.T_frames_in_world[self.module_mapping[self.jam_type]]
 
     def compute_com(self, T_list, l):
         coms = []
@@ -157,7 +216,7 @@ class StateEstimator(Node):
 
         return T_vc
     
-    def convert_frames(self, T_list, frame_number=-1, T_target=None):
+    def convert_frames(self, T_list, T_target=None, frame_number=-1):
         T_list_new = []
 
         if frame_number != -1:
@@ -174,3 +233,19 @@ class StateEstimator(Node):
         
 
         return T_list_new
+    
+
+def main():
+    rclpy.init()
+    state_estimation_node = StateEstimator()
+
+    try:
+        rclpy.spin(state_estimation_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        state_estimation_node.destroy_node()
+        rclpy.shutdown()
+
+if __name__=="__main__":
+    main()

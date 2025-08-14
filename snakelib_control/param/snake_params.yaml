@@ -16,18 +16,19 @@ command_manager:
                     'RUB-014',
                     'RUB-019',
                     'RUB-009',
-                    'RUB-021',
+                    'RUA_010',
                     'RUB-015',
                     'RUB-018',
                     'RUB-005',
                     'RUB-003',
                     'RUB-010',
                     'RUB-008',
-                    'RUB-001',
+                    'RUB-020',
                     'RUB-013',
                     'RUB-012',
                     'RUB_006',
                     'RUB-017']
+            n_modules: 16
             home: [0.58, 0.0, 0.82,  0.0, -0.4, 0.0, -0.96, 0.0, 0.52, 0.0, 0.89, 0.0, -0.89, 0.0, -0.12, 0.0]
             zero_offset: [0.0, 0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] # Subtracted from computed joint angles
             
@@ -125,6 +126,8 @@ command_manager:
                     arc_beta: 0.3
                     imu_dir: 1
                     dWs_dAodd: 0.125
+                head_look:
+                    n_headlook_modules: 2
                 head_look_ik:
                     n_modules: 2 # Only allowed for now
 

@@ -96,6 +96,12 @@ class JoystickTeleop(Node):
         self._tightness_min = self._joy_to_gait.get("tightness_min", 0)
         self._tightness_max = self._gait_params.get("pole_climb", {}).get("A_max", 1.5)
 
+        # Headlook module offset
+        self.offset=0
+        self._offset_step = 0.25
+        self._offset_min = 0
+        self._offset_max = self._snake_params.get("n_modules")-self._gait_params.get("head_look").get("n_headlook_modules")
+
         # Get Conical sidewinding parameters
         self._slope_max = self._gait_params.get("conical_sidewinding", {}).get("max_slope", 0.1)
         self._slope_default = self._joy_to_gait.get("slope_default", 0.0)
@@ -240,6 +246,11 @@ class JoystickTeleop(Node):
                 self.command = "rolling_helix"
                 if self._last_sent != "rolling_helix":
                     self._direction = 0
+            elif self._command_list[0] == "offset":
+                # Increase/decrease module offset for head look
+                self.offset += self._offset_step if self._command_list[1] == "plus" else -self._offset_step
+                self.offset = np.clip(self.offset, self._offset_min, self._offset_max)
+                self.get_logger().info(f"Offset : {str(self.offset)}")
 
             elif self._command_list[0] == "slope" and self.command == "conical_sidewinding":
                 # Increase/decrease conical sidewinding slope
@@ -288,8 +299,8 @@ class JoystickTeleop(Node):
 
         # Add x & y state only when head look gait is selected
         if self.command == "head_look":
-            self._snake_command.param_name.extend(["x_state", "y_state"])
-            self._snake_command.param_value.extend([self._x_state, self._y_state])
+            self._snake_command.param_name.extend(["x_state", "y_state","offset"])
+            self._snake_command.param_value.extend([self._x_state, self._y_state, self.offset])
 
         # Add x, y, z, pitch & yaw states only when inverse kinematics based head look gait is selected
         if self.command == "head_look_ik":

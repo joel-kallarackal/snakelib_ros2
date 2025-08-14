@@ -25,7 +25,11 @@ def head_look(self, t: float = 0, current_angles: np.ndarray = None, params: Dic
     params = self.update_params(self.default_gait_params.get(self.current_gait, {}), params)
 
     x_state, y_state = params["x_state"], params["y_state"]
-
+    offset = int(params["offset"])
+    
+    if offset%2!=0:
+        x_state, y_state = y_state, x_state
+    
     # Use accelerations to correct direction of rotation.
     head_acc = [params["head_acc_x"], params["head_acc_y"]]
     before_head_vel = y_state if abs(head_acc[1]) > abs(head_acc[0]) else x_state
@@ -35,14 +39,22 @@ def head_look(self, t: float = 0, current_angles: np.ndarray = None, params: Dic
     head_vel *= -np.sign(head_acc[np.argmax(np.abs(head_acc))])
     if abs(head_acc[1]) > abs(head_acc[0]):
         head_vel *= -1
-
+    
     vel = np.array([head_vel, before_head_vel])
 
     # Slice head group joint angles form all joint angles.
-    headlook_group_current_angles = current_angles[:n_headlook_modules]
+    headlook_group_current_angles = current_angles[offset:offset+n_headlook_modules]
 
     headlook_group_target_angles = headlook_group_current_angles + (vel * dt)
     headlook_group_target_angles = np.clip(headlook_group_target_angles, MIN_JOINT_ANGLE, MAX_JOINT_ANGLE)
-    target_angles = np.concatenate((headlook_group_target_angles, current_angles[n_headlook_modules:]))
+    if offset==0:
+        target_angles = np.concatenate((headlook_group_target_angles, current_angles[n_headlook_modules:]))
+    elif offset==14:
+        target_angles = np.concatenate((current_angles[:offset], headlook_group_target_angles))
+    else:
+        target_angles = np.concatenate((current_angles[:offset], headlook_group_target_angles, current_angles[offset+n_headlook_modules:]))
+
+    
+        
 
     return target_angles
