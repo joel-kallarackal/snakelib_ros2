@@ -7,7 +7,7 @@ import os
 
 def generate_launch_description():
     snake_type_arg = DeclareLaunchArgument(
-        'snake_type', default_value='REU', description='Snake type')
+        'snake_type', default_value='SEA', description='Snake type')
     num_modules_arg = DeclareLaunchArgument(
         'num_modules', default_value='16', description='Number of modules')
     basic_gui_arg = DeclareLaunchArgument(

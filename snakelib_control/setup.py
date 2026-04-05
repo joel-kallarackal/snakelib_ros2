@@ -39,7 +39,8 @@ setup(
         'console_scripts': [
             'command_manager_node = snakelib_control.command_manager_node:main',
             'gait_script_node = snakelib_control.gait_script_node:main',
-            'joystick_teleop_node = snakelib_control.joystick_teleop_node:main'
+            'joystick_teleop_node = snakelib_control.joystick_teleop_node:main',
+            'pybullet_interface = snakelib_bullet.pybullet_interface:main'
         ],
     },
 )

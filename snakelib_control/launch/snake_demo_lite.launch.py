@@ -5,6 +5,8 @@ from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitut
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch.substitutions import PythonExpression
+from launch_ros.parameter_descriptions import ParameterValue
+import yaml
 
 def generate_launch_description():
     # Declare launch arguments
@@ -19,8 +21,11 @@ def generate_launch_description():
         description='Number of modules'
     )
 
-    # TODO: Load from a param file 
-    snake_name = "REU"
+    params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+    with open(params_path1, "r") as file:
+        data = yaml.safe_load(file)
+    snake_name = data.get("snake_type")
 
     num_modules = LaunchConfiguration('num_modules')
 
@@ -31,7 +36,7 @@ def generate_launch_description():
 
     # Param files
     snake_params_file = os.path.join(snakelib_control_dir, 'param', 'snake_params.yaml')
-
+  
     file_path = f"{snake_name}_snake/{snake_name}_snake.xacro"
 
     xacro_file = PathJoinSubstitution([
@@ -113,6 +118,6 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             output='screen',
-            parameters=[{'robot_description': robot_description_content}]
+            parameters=[{'robot_description': ParameterValue(robot_description_content, value_type=str)}]
         ),
     ])

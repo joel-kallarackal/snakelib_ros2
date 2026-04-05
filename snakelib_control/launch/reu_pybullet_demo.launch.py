@@ -33,7 +33,7 @@ def generate_launch_description():
         # pybullet_interface node
         Node(
             package='snakelib_bullet',
-            executable='pybullet_interface.py',
+            executable='pybullet_interface',
             name='pybullet_interface',
             output='screen',
             parameters=[config_file,  # Load sim_params.yaml as parameters

@@ -25,12 +25,16 @@ class AbstractController(metaclass=ABCMeta):
         Args:
             snake_type: string denoting the type of snake, e.g. "REU"
         """
-        self._snake_type = snake_type
         # Load YAML file
         params_path = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'snake_params.yaml')
 
         with open(params_path, "r") as file:
             data = yaml.safe_load(file)
+
+        params_path = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+
+        with open(params_path, "r") as file:
+            self._snake_type = yaml.safe_load(file).get("snake_type")
         
         self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{self._snake_type}", {})
         self._module_names = self._snake_param.get("module_names", [])

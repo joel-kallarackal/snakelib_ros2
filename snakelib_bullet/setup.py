@@ -24,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pybullet_interface = snakelib_bullet.pybullet_interface:main'
+            'pybullet_interface = snakelib_bullet.pybullet_interface:main',
+            'test = snakelib_bullet.test:main',
         ],
     },
 )

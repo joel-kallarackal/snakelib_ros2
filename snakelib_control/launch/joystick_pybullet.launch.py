@@ -4,12 +4,19 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import os
 from ament_index_python.packages import get_package_share_directory
+import yaml 
 
 def generate_launch_description():
     # Launch arguments
     snake_type = LaunchConfiguration('snake_type')
     num_modules = LaunchConfiguration('num_modules')
     config_file = LaunchConfiguration('config_file')
+    
+    params_path1 = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+        
+    with open(params_path1, "r") as file:
+        data = yaml.safe_load(file)
+    snake_name = data.get("snake_type")
 
     # Package paths
     snakelib_control_path = get_package_share_directory('snakelib_control')
@@ -23,7 +30,7 @@ def generate_launch_description():
 
     # Return launch description
     return LaunchDescription([
-        DeclareLaunchArgument('snake_type', default_value='REU'),
+        DeclareLaunchArgument('snake_type', default_value=snake_name),
         DeclareLaunchArgument('num_modules', default_value='16'),
         DeclareLaunchArgument('config_file', default_value=os.path.join(snakelib_bullet_path, 'param', 'sim_params.yaml')),
 

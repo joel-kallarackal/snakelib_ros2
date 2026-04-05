@@ -46,6 +46,10 @@ class StateEstimator(Node):
             self.data = yaml.safe_load(file)
 
         self.dh = self.data.get("dh")
+        self.head_len = self.data.get("head_len")
+        self.module_lens = [self.dh[i][2] for i in range(len(self.dh))]
+        self.module_lens.append(self.head_len)
+
         self.l = self.data.get("l")
 
         self.current_joint_angles = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -53,7 +57,7 @@ class StateEstimator(Node):
 
         self.module_mapping = {"head": 16, "tail": 1, "tail_tip": 0}
 
-        self.head_tip_in_head_frame = [-self.l, 0, 0, 1]
+        self.head_tip_in_head_frame = [self.head_len, 0, 0, 1]
 
     def joint_state_cb(self, msg):
         self.current_joint_angles = list(msg.position)[::-1]
@@ -66,10 +70,10 @@ class StateEstimator(Node):
             T_frames_in_body = self.convert_frames(T_frames_in_head, T_body_in_head)
             self.T_frames_in_world = [T_body_in_world @ T_frames_in_body[i] for i in range(len(T_frames_in_body))]
  
-            if self.jam_type=="tail":
+            if self.jam_type=="tail" or self.jam_type=="tail_tip":
                 # self.unjammed_tip_location_in_world =  ((T_body_in_world @ (np.linalg.inv(T_body_in_head) @ T_frames_in_head[16])) @ self.head_tip_in_head_frame)[:3]
                 # self.unjammed_tip_location_in_world =  ((T_body_in_world @ (np.linalg.inv(T_body_in_head) @ T_frames_in_head[16])))[:3, 3]
-                self.unjammed_tip_location_in_world = self.T_frames_in_world[self.module_mapping["head"]][:3, 3]
+                self.unjammed_tip_location_in_world = (self.T_frames_in_world[self.module_mapping["head"]] @ self.head_tip_in_head_frame)[:3]
             elif self.jam_type=="head":
                 self.unjammed_tip_location_in_world = self.T_frames_in_world[self.module_mapping["tail_tip"]][:3, 3]
             else:
@@ -80,8 +84,8 @@ class StateEstimator(Node):
             self.get_logger().info(f"Distance : {np.sqrt(x**2+y**2+z**2)}")
 
             matrices = [frame for frame in self.T_frames_in_world]
-            matrices.append(np.eye(4))
-            matrices.append(T_body_in_world)
+            matrices.append(np.eye(4)) # World Frame
+            matrices.append(T_body_in_world) # Body Frame
             for i, mat in enumerate(matrices):
                 marker = Marker()
                 marker.header.frame_id = "world"
@@ -97,7 +101,11 @@ class StateEstimator(Node):
                 quat = quaternion_from_matrix(mat)
                 marker.pose.orientation = Quaternion(x=quat[0], y=quat[1], z=quat[2], w=quat[3])
 
-                marker.scale.x = 0.05  # shaft length
+                if i<len(matrices)-2:
+                    marker.scale.x = self.module_lens[i]  # shaft length
+                else:
+                    marker.scale.x = 0.05 # For world and body frame
+                
                 marker.scale.y = 0.02  # shaft diameter
                 marker.scale.z = 0.02  # head diameter
 

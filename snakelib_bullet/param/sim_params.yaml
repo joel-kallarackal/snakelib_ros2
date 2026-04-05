@@ -1,6 +1,6 @@
 pybullet_interface:  # This must match your node's name or namespace
   ros__parameters:
-    snake_type: "REU"
+    snake_type: "SEA"
     loop_rate: 100.0
     urdf_spawn_pose: [0.0, 0.0, 0.0] # x,y,z
     tracking_cam: False 

@@ -19,6 +19,12 @@ class Gaitlib(metaclass=ABCMeta):
 
         with open(params_path, "r") as file:
             data = yaml.safe_load(file)
+
+        params_path = os.path.join(get_package_share_directory('snakelib_control'), 'param', 'launch_params.yaml')
+
+        with open(params_path, "r") as file:
+            snake_type = yaml.safe_load(file).get("snake_type")
+            
         self._snake_param = data.get("command_manager").get("ros__parameters").get(f"{snake_type}", {})
         self.default_gait_params = self._snake_param.get("gait_params", {})
 

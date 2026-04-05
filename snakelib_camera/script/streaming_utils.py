@@ -22,7 +22,7 @@ def execute_script(password, ip, base_dir, script_name, script_args=None):
         script_name += ".sh"
 
     # Bypass prompt for fingerprint addition and strick host key checking
-    login = f"sshpass -p {password} ssh -o 'StrictHostKeyChecking no' root@{ip}"
+    login = f"sshpass -p {+-password} ssh -o 'StrictHostKeyChecking no' root@{ip}"
     pos_login_execution = f"cd {base_dir} && bash {script_name} {script_args}"
 
     cmd = f'{login} "{pos_login_execution}"'
@@ -60,12 +60,12 @@ def toggle_cam_stream(stream_name, on, max_attempts=2):
     attempt = 0
     while not client.wait_for_service(timeout_sec=1.0):
         node.get_logger().info('Waiting for toggle_stream service...')
-        # attempt += 1
-        # if attempt >= max_attempts:
-        #     node.get_logger().warn(f"Service not available after {max_attempts} attempts.")
-        #     node.destroy_node()
-        #     rclpy.shutdown()
-        #     return False
+        attempt += 1
+        if attempt >= max_attempts:
+            node.get_logger().warn(f"Service not available after {max_attempts} attempts.")
+            node.destroy_node()
+            rclpy.shutdown()
+            return False
 
     # Try calling the service up to max_attempts times
     for attempt in range(1, max_attempts + 1):
@@ -113,12 +113,12 @@ def toggle_led_stream(stream_name, on, max_attempts=2):
     attempt = 0
     while not client.wait_for_service(timeout_sec=1.0):
         node.get_logger().info('Waiting for toggle_stream service...')
-        # attempt += 1
-        # if attempt >= max_attempts:
-        #     node.get_logger().warn(f"Service not available after {max_attempts} attempts.")
-        #     node.destroy_node()
-        #     rclpy.shutdown()
-        #     return False
+        attempt += 1
+        if attempt >= max_attempts:
+            node.get_logger().warn(f"Service not available after {max_attempts} attempts.")
+            node.destroy_node()
+            rclpy.shutdown()
+            return False
 
     # Try calling the service up to max_attempts times
     for attempt in range(1, max_attempts + 1):
